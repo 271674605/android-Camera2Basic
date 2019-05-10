@@ -359,12 +359,12 @@ public class Camera2BasicFragment extends Fragment
             activity.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
+                    Thread.currentThread().setName("bruce线程");
                     Toast.makeText(activity, text, Toast.LENGTH_SHORT).show();
                 }
             });
         }
     }
-
     /**
      * Given {@code choices} of {@code Size}s supported by a camera, choose the smallest one that
      * is at least as large as the respective texture view size, and that is at most as large as the
@@ -932,6 +932,7 @@ public class Camera2BasicFragment extends Fragment
 
         @Override
         public void run() {
+            Thread.currentThread().setName("bruce线程5");
             ByteBuffer buffer = mImage.getPlanes()[0].getBuffer();
             byte[] bytes = new byte[buffer.remaining()];
             buffer.get(bytes);

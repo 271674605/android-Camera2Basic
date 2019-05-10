@@ -20,6 +20,7 @@ import android.app.Service;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -33,11 +34,21 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.Date;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class CameraActivity extends AppCompatActivity {
     public int switchFunc = 0;
     public String TAG = "bruce";
     // 声明Button
+    /**Timer对象**/
+    Timer mTimer = null;
+
+    /**TimerTask对象**/
+    TimerTask mTimerTask = null;
+
+    /**记录TimerID**/
+    int mTimerID = 0;
     private Button startBtn,stopBtn,bindBtn,unbindBtn;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -79,11 +90,53 @@ public class CameraActivity extends AppCompatActivity {
 
             }
         }.start();
-
+        StartTimer();
+        StartAsync();
         handler.postDelayed(task,1000);//延迟调用
         Log.i(TAG, "to addMultiThreadDebug end！");
     }
+    public void StartTimer() {
 
+        if (mTimer == null) {
+            mTimerTask = new TimerTask() {
+                public void run() {
+                    Log.i(TAG, "to TimerTask！");
+                    Thread.currentThread().setName("bruce线程4");
+                    //mTimerTask与mTimer执行的前提下每过1秒进一次这里
+                    mTimerID ++;
+                    Message msg = new Message();
+                    msg.what = 1;
+                    msg.arg1 = (int) (mTimerID);
+                    handler.sendMessage(msg);
+                }
+            };
+            mTimer = new Timer();
+
+            //第一个参数为执行的mTimerTask
+            //第二个参数为延迟的时间 这里写1000的意思是mTimerTask将延迟1秒执行
+            //第三个参数为多久执行一次 这里写1000表示每1秒执行一次mTimerTask的Run方法
+            mTimer.schedule(mTimerTask, 1000, 1000);
+        }
+
+    }
+
+    public void CloseTimer() {
+
+        //在这里关闭mTimer 与 mTimerTask
+        if (mTimer != null) {
+            mTimer.cancel();
+            mTimer = null;
+        }
+        if (mTimerTask != null) {
+            mTimerTask = null;
+        }
+
+        /**ID重置**/
+        mTimerID = 0;
+
+        //这里发送一条只带what空的消息
+        handler.sendEmptyMessage(1);
+    }
     private Handler handler = new Handler();
     private Runnable task = new Runnable(){
         public void run() {
@@ -189,4 +242,47 @@ public class CameraActivity extends AppCompatActivity {
             unbindService(conn);
         }
     };
+
+    public void StartAsync() {
+        new AsyncTask<Object, Object, Object>() {
+
+            @Override
+            protected void onPreExecute() {
+                //首先执行这个方法，它在UI线程中 可以执行一些异步操作
+                Log.i(TAG, "开始加载进度！");
+                super.onPreExecute();
+            }
+
+            @Override
+            protected Object doInBackground(Object... arg0) {
+                //异步后台执行 ，执行完毕可以返回出去一个结果object对象
+
+                //得到开始加载的时间
+                Long startTime = System.currentTimeMillis();
+                for (int i = 0; i < 100; i++) {
+                    //执行这个方法会异步调用onProgressUpdate方法，可以用来更新UI
+                    publishProgress(i);
+                }
+                //得到结束加载的时间
+                Long endTime = System.currentTimeMillis();
+
+                //将读取时间返回
+                return endTime - startTime;
+            }
+
+            @Override
+            protected void onPostExecute(Object result) {
+                //doInBackground之行结束以后在这里可以接收到返回的结果对象
+                super.onPostExecute(result);
+            }
+
+
+            @Override
+            protected void onProgressUpdate(Object... values) {
+                //时时拿到当前的进度更新UI
+                Log.i(TAG, "当前加载进度！");
+                super.onProgressUpdate(values);
+            }
+        }.execute();//可以理解为执行 这个AsyncTask
+    }
 }
