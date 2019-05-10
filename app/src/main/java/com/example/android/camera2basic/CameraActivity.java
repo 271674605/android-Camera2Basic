@@ -62,6 +62,24 @@ public class CameraActivity extends AppCompatActivity {
                         .commit();
             }
             addMultiThreadDebug();
+            //Handler消息传递:子线程到主线程---------------------------------------
+            //2018-10-31 08:16:52.218 5310-5330/? I/bruce: start: I am thread=bruce线程SUB1_2_MAIN
+            //2018-10-31 08:16:52.251 5310-5310/? I/bruce: I am from Sub thread
+            //2018-10-31 08:16:52.251 5310-5310/? I/bruce: I am thread=main
+            testSub2Main();
+
+            //Handler消息传递:主线程到子线程---------------------------------------
+//            2019-04-16 15:51:00.053 7029-7029/com.example.android.camera2basic I/bruce: start: I am thread=main
+//            2019-04-16 15:51:00.053 7029-7048/com.example.android.camera2basic I/bruce: I am from main thread
+//            2019-04-16 15:51:00.053 7029-7048/com.example.android.camera2basic I/bruce: I am thread=bruce线程MAIN_2_SUB2
+            testMain2Sub();
+
+            //Handler消息传递:子线程到子线程---------------------------------------
+//            2019-04-16 15:52:17.625 7153-7173/? I/bruce: start: I am thread=bruce线程SUB_2_SUB-2
+//            2019-04-16 15:52:17.625 7153-7172/? I/bruce: I am from other thread
+//            2019-04-16 15:52:17.625 7153-7172/? I/bruce: I am thread=bruce线程SUB_2_SUB
+            testSub2Sub();
+
         }else if(switchFunc == 1){
             // 设置当前布局视图
             setContentView(R.layout.myservice);
@@ -79,6 +97,56 @@ public class CameraActivity extends AppCompatActivity {
             unbindBtn.setOnClickListener(unBindListener);
         }
     }
+
+    private Handler mMainHandler = new Handler(){
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            if(msg.what==Constants.SUB1_2_MAIN){
+                Log.i(TAG, "I am from Sub thread");
+                Log.i(TAG, "I am thread="+Thread.currentThread().getName());
+            }
+        }
+    };
+
+    private void testSub2Sub() {
+        Runnable3 runnable3 = new Runnable3();
+        new Thread(runnable3).start(); //启动线程3
+
+        //注意：这里由于是线程异步，程序执行到这里的时候，子线程的run方法不一定执行完，可能会导致myLooper3为空，所以，这里循环等待，知道初始化完
+        while (true){
+            if(runnable3.myLooper3!=null){
+                Runnable4 runnable4 = new Runnable4(runnable3.handler3);
+                new Thread(runnable4).start();
+                return;
+            }
+        }
+
+    }
+
+    private void testMain2Sub() {
+        //主线程向子线程发消息
+        Runnable2 runnable2 = new Runnable2();
+        new Thread(runnable2).start(); //启动线程2
+        Message msg = new Message();
+        msg.what=Constants.MAIN_2_SUB2;
+
+        //注意：这里由于是线程异步，程序执行到这里的时候，子线程的run方法不一定执行完，可能会导致myLooper3为空，所以，这里循环等待，知道初始化完
+        while (true){
+            if(runnable2.mylooper2!=null){
+                Log.i(TAG,"start: I am thread="+Thread.currentThread().getName());
+                runnable2.handler2.sendMessage(msg);
+                return;
+            }
+        }
+
+    }
+
+    private void testSub2Main() {
+        //子线程向主线程发消息
+        new Thread(new Runnable1(mMainHandler)).start();
+    }
+
     public void addMultiThreadDebug(){
         Log.i(TAG, "to addMultiThreadDebug！");
         new Thread("bruce线程2") {
@@ -90,13 +158,49 @@ public class CameraActivity extends AppCompatActivity {
 
             }
         }.start();
-        StartTimer();
-        StartAsync();
-        handler.postDelayed(task,1000);//延迟调用
+        //StartTimer();
+        //StartAsync();
+        handlerTask.postDelayed(task,1000);//延迟调用
         Log.i(TAG, "to addMultiThreadDebug end！");
     }
-    public void StartTimer() {
 
+    @Override
+    protected void onStart() {
+        super.onStart();
+        Log.i(TAG, "onStart------------------------------>");
+    }
+
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+        Log.i(TAG, "onRestart------------------------------>");
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Log.i(TAG, "onResume------------------------------>");
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        Log.i(TAG, "onPause------------------------------>");
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        Log.i(TAG, "onStop------------------------------>");
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        Log.i(TAG, "onDestroy------------------------------>");
+    }
+
+    public void StartTimer() {
         if (mTimer == null) {
             mTimerTask = new TimerTask() {
                 public void run() {
@@ -107,21 +211,18 @@ public class CameraActivity extends AppCompatActivity {
                     Message msg = new Message();
                     msg.what = 1;
                     msg.arg1 = (int) (mTimerID);
-                    handler.sendMessage(msg);
+                    handlerTime.sendMessage(msg);
                 }
             };
             mTimer = new Timer();
-
             //第一个参数为执行的mTimerTask
             //第二个参数为延迟的时间 这里写1000的意思是mTimerTask将延迟1秒执行
             //第三个参数为多久执行一次 这里写1000表示每1秒执行一次mTimerTask的Run方法
             mTimer.schedule(mTimerTask, 1000, 1000);
         }
-
     }
 
     public void CloseTimer() {
-
         //在这里关闭mTimer 与 mTimerTask
         if (mTimer != null) {
             mTimer.cancel();
@@ -130,20 +231,27 @@ public class CameraActivity extends AppCompatActivity {
         if (mTimerTask != null) {
             mTimerTask = null;
         }
-
         /**ID重置**/
         mTimerID = 0;
-
         //这里发送一条只带what空的消息
-        handler.sendEmptyMessage(1);
+        handlerTime.sendEmptyMessage(1);
     }
-    private Handler handler = new Handler();
+    Handler handlerTime = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+            }
+            super.handleMessage(msg);
+        }
+    };
+
+    private Handler handlerTask = new Handler();
     private Runnable task = new Runnable(){
         public void run() {
-            Thread.currentThread().setName("bruce线程3");
-            handler.postDelayed(this,1000);//设置延迟时间，此处是time_interval秒
+            //Thread.currentThread().setName("bruce线程3");//main线程
+            handlerTask.postDelayed(this,1000);//设置延迟时间，此处是time_interval秒
             //需要执行的代码
-            Log.i(TAG, "bruce线程3！");
+            Log.i(TAG, "bruce线程3  main！");
         }
     };
     private Handler mHandler = new Handler(new Handler.Callback() {
@@ -245,7 +353,6 @@ public class CameraActivity extends AppCompatActivity {
 
     public void StartAsync() {
         new AsyncTask<Object, Object, Object>() {
-
             @Override
             protected void onPreExecute() {
                 //首先执行这个方法，它在UI线程中 可以执行一些异步操作
@@ -256,27 +363,18 @@ public class CameraActivity extends AppCompatActivity {
             @Override
             protected Object doInBackground(Object... arg0) {
                 //异步后台执行 ，执行完毕可以返回出去一个结果object对象
-
-                //得到开始加载的时间
-                Long startTime = System.currentTimeMillis();
+                Long startTime = System.currentTimeMillis(); //得到开始加载的时间
                 for (int i = 0; i < 100; i++) {
-                    //执行这个方法会异步调用onProgressUpdate方法，可以用来更新UI
-                    publishProgress(i);
+                    publishProgress(i);//执行这个方法会异步调用onProgressUpdate方法，可以用来更新UI
                 }
-                //得到结束加载的时间
-                Long endTime = System.currentTimeMillis();
-
-                //将读取时间返回
-                return endTime - startTime;
+                Long endTime = System.currentTimeMillis();//得到结束加载的时间
+                return endTime - startTime;//将读取时间返回
             }
-
             @Override
             protected void onPostExecute(Object result) {
                 //doInBackground之行结束以后在这里可以接收到返回的结果对象
                 super.onPostExecute(result);
             }
-
-
             @Override
             protected void onProgressUpdate(Object... values) {
                 //时时拿到当前的进度更新UI
@@ -285,4 +383,89 @@ public class CameraActivity extends AppCompatActivity {
             }
         }.execute();//可以理解为执行 这个AsyncTask
     }
+}
+class Runnable1 implements Runnable {
+    Handler handler;
+    public String TAG = "bruce";
+    public Runnable1(Handler handler){
+        this.handler = handler;
+    }
+
+    @Override
+    public void run() {
+        Thread.currentThread().setName("bruce线程SUB1_2_MAIN");
+        Message msg = new Message();
+        msg.what=Constants.SUB1_2_MAIN;
+        Log.i(TAG,"start: I am thread="+Thread.currentThread().getName());
+        handler.sendMessage(msg);
+    }
+}
+class Runnable2 implements Runnable {
+    public Looper mylooper2;
+    public Handler  handler2;
+    public String TAG = "bruce";
+    @Override
+    public void run() {
+        Thread.currentThread().setName("bruce线程MAIN_2_SUB2");
+        Looper.prepare();              //创建一个新的looper，并将其放入sThreadLocal中
+        handler2= new Handler(){
+            @Override
+            public void handleMessage(Message msg) {
+                super.handleMessage(msg);
+                if(msg.what==Constants.MAIN_2_SUB2){
+                    Log.i(TAG,"I am from main thread");
+                    Log.i(TAG,"I am thread="+Thread.currentThread().getName());
+                }
+            }
+        };
+        mylooper2 = Looper.myLooper();//从threadlocal中取出当前线程的looper
+        Looper.loop();
+    }
+}
+class Runnable3 implements Runnable {
+    public Handler  handler3;
+    public Looper myLooper3 ;
+    public String TAG = "bruce";
+    @Override
+    public void run() {
+        Thread.currentThread().setName("bruce线程SUB_2_SUB");
+        Looper.prepare();
+        //handler3= new Handler(Looper.getMainLooper()){    //如果这样，则明明在Thread3中的handler，却在MainThread中了。那就是指定了Looper，则Looper所在线程就是Handler回调所在线程。
+        handler3= new Handler(){//没有指定，则在当前线程。
+            @Override
+            public void handleMessage(Message msg) {
+                super.handleMessage(msg);
+                if(msg.what==Constants.SUB_2_SUB){
+                    Log.i(TAG,"I am from other thread");
+                    Log.i(TAG,"I am thread="+Thread.currentThread().getName());
+                }
+            }
+        };
+        myLooper3= Looper.myLooper();
+        Looper.loop();
+
+    }
+}
+class Runnable4 implements Runnable {
+    Handler handler;
+    public String TAG = "bruce";
+    public Runnable4 (Handler handler){
+        this.handler = handler;
+    }
+
+    @Override
+    public void run() {
+        Thread.currentThread().setName("bruce线程SUB_2_SUB-2");
+        Message msg = new Message();
+        msg.what =Constants.SUB_2_SUB;
+        Log.i(TAG,"start: I am thread="+Thread.currentThread().getName());
+        handler.sendMessage(msg);
+
+    }
+}
+
+class Constants {
+    public static int SUB1_2_MAIN = 0;
+    public static int MAIN_2_SUB2 = 1;
+    public static int SUB_2_SUB = 2;
 }
