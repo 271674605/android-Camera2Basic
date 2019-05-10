@@ -21,15 +21,21 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
+import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.Date;
+
 public class CameraActivity extends AppCompatActivity {
-    public int switchFunc = 1;
+    public int switchFunc = 0;
     public String TAG = "bruce";
     // 声明Button
     private Button startBtn,stopBtn,bindBtn,unbindBtn;
@@ -44,6 +50,7 @@ public class CameraActivity extends AppCompatActivity {
                         .replace(R.id.container, Camera2BasicFragment.newInstance())
                         .commit();
             }
+            addMultiThreadDebug();
         }else if(switchFunc == 1){
             // 设置当前布局视图
             setContentView(R.layout.myservice);
@@ -61,6 +68,52 @@ public class CameraActivity extends AppCompatActivity {
             unbindBtn.setOnClickListener(unBindListener);
         }
     }
+    public void addMultiThreadDebug(){
+        Log.i(TAG, "to addMultiThreadDebug！");
+        new Thread("bruce线程2") {
+            @Override
+            public void run() {
+                Log.i(TAG, "bruce线程2！");
+                //发送一条空的消息，空消息中必需带一个what字段，用于在handler中接收，这里暂时我先写成0
+                mHandler.sendEmptyMessage(0);
+
+            }
+        }.start();
+
+        handler.postDelayed(task,1000);//延迟调用
+        Log.i(TAG, "to addMultiThreadDebug end！");
+    }
+
+    private Handler handler = new Handler();
+    private Runnable task = new Runnable(){
+        public void run() {
+            Thread.currentThread().setName("bruce线程3");
+            handler.postDelayed(this,1000);//设置延迟时间，此处是time_interval秒
+            //需要执行的代码
+            Log.i(TAG, "bruce线程3！");
+        }
+    };
+    private Handler mHandler = new Handler(new Handler.Callback() {
+        @Override
+        public boolean handleMessage(Message msg) {
+            new Thread("bruce线程1") {
+                @Override
+                public void run() {
+                    Log.i(TAG, "bruce线程1！");
+                    //如果handler不指定looper的话，默认为mainlooper来进行消息循环，而当前是在一个新的线程中它没有默认的looper
+                    //所以我们须要手动调用prepare()拿到他的loop，可以理解为在Thread创建Looper的消息队列
+                    Looper.prepare();
+                    Toast.makeText(CameraActivity.this, "收到消息",Toast.LENGTH_LONG).show();
+                    //在这里执行这个消息循环如果没有这句，就好比只创建了Looper的消息队列而，没有执行这个队列那么上面Toast的内容是不会显示出来的
+                    Looper.loop();
+                    //如果没有   Looper.prepare();  与 Looper.loop();会抛出异常Can't create handler inside thread that has not called Looper.prepare()
+                    //原因是我们新起的线程中是没有默认的looper所以须要手动调用prepare()拿到他的loop
+                }
+            }.start();
+            return false;
+        }
+    });
+
     //---------------------------startService---------------------------------------------------
     // 启动Service监听器
     private View.OnClickListener startListener = new View.OnClickListener() {
