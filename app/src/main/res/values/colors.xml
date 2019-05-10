@@ -16,4 +16,6 @@
 -->
 <resources>
     <color name="control_background">#cc4285f4</color>
+	<color name="red_bg">#f00</color>
+	<color name="blue_text">#0000ff</color>
 </resources>
