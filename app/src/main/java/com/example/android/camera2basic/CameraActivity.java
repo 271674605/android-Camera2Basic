@@ -30,10 +30,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.TextView;
 import android.widget.Toast;
-
-import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -98,71 +95,6 @@ public class CameraActivity extends AppCompatActivity {
         }
     }
 
-    private Handler mMainHandler = new Handler(){
-        @Override
-        public void handleMessage(Message msg) {
-            super.handleMessage(msg);
-            if(msg.what==Constants.SUB1_2_MAIN){
-                Log.i(TAG, "I am from Sub thread");
-                Log.i(TAG, "I am thread="+Thread.currentThread().getName());
-            }
-        }
-    };
-
-    private void testSub2Sub() {
-        Runnable3 runnable3 = new Runnable3();
-        new Thread(runnable3).start(); //启动线程3
-
-        //注意：这里由于是线程异步，程序执行到这里的时候，子线程的run方法不一定执行完，可能会导致myLooper3为空，所以，这里循环等待，知道初始化完
-        while (true){
-            if(runnable3.myLooper3!=null){
-                Runnable4 runnable4 = new Runnable4(runnable3.handler3);
-                new Thread(runnable4).start();
-                return;
-            }
-        }
-
-    }
-
-    private void testMain2Sub() {
-        //主线程向子线程发消息
-        Runnable2 runnable2 = new Runnable2();
-        new Thread(runnable2).start(); //启动线程2
-        Message msg = new Message();
-        msg.what=Constants.MAIN_2_SUB2;
-
-        //注意：这里由于是线程异步，程序执行到这里的时候，子线程的run方法不一定执行完，可能会导致myLooper3为空，所以，这里循环等待，知道初始化完
-        while (true){
-            if(runnable2.mylooper2!=null){
-                Log.i(TAG,"start: I am thread="+Thread.currentThread().getName());
-                runnable2.handler2.sendMessage(msg);
-                return;
-            }
-        }
-
-    }
-
-    private void testSub2Main() {
-        //子线程向主线程发消息
-        new Thread(new Runnable1(mMainHandler)).start();
-    }
-
-    public void addMultiThreadDebug(){
-        Log.i(TAG, "to addMultiThreadDebug！");
-        new Thread("bruce线程2") {
-            @Override
-            public void run() {
-                Log.i(TAG, "bruce线程2！");
-                //发送一条空的消息，空消息中必需带一个what字段，用于在handler中接收，这里暂时我先写成0
-                mHandler.sendEmptyMessage(0);
-
-            }
-        }.start();
-        //StartTimer();
-        //StartAsync();
-        handlerTask.postDelayed(task,1000);//延迟调用
-        Log.i(TAG, "to addMultiThreadDebug end！");
-    }
 
     @Override
     protected void onStart() {
@@ -185,6 +117,7 @@ public class CameraActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
+        //CloseTimer();
         Log.i(TAG, "onPause------------------------------>");
     }
 
@@ -200,6 +133,78 @@ public class CameraActivity extends AppCompatActivity {
         Log.i(TAG, "onDestroy------------------------------>");
     }
 
+//////////////////////testSub2Sub/////testMain2Sub//////testSub2Main///////////////////////////////////////////////////////////////////////////
+    private Handler mMainHandler = new Handler(){
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            if(msg.what==Constants.SUB1_2_MAIN){
+                Log.i(TAG, "I am from Sub thread");
+                Log.i(TAG, "I am thread="+Thread.currentThread().getName());
+            }
+        }
+    };
+    private void testSub2Sub() {
+        Runnable3 runnable3 = new Runnable3();
+        new Thread(runnable3).start(); //启动线程3
+        //注意：这里由于是线程异步，程序执行到这里的时候，子线程的run方法不一定执行完，可能会导致myLooper3为空，所以，这里循环等待，知道初始化完
+        while (true){
+            if(runnable3.myLooper3!=null){
+                Runnable4 runnable4 = new Runnable4(runnable3.handler3);
+                new Thread(runnable4).start();
+                return;
+            }
+        }
+    }
+    private void testMain2Sub() {
+        //主线程向子线程发消息
+        Runnable2 runnable2 = new Runnable2();
+        new Thread(runnable2).start(); //启动线程2
+        Message msg = new Message();
+        msg.what=Constants.MAIN_2_SUB2;
+
+        //注意：这里由于是线程异步，程序执行到这里的时候，子线程的run方法不一定执行完，可能会导致myLooper3为空，所以，这里循环等待，知道初始化完
+        while (true){
+            if(runnable2.mylooper2!=null){
+                Log.i(TAG,"start: I am thread="+Thread.currentThread().getName());
+                runnable2.handler2.sendMessage(msg);
+                return;
+            }
+        }
+    }
+    private void testSub2Main() {
+        //子线程向主线程发消息
+        new Thread(new Runnable1(mMainHandler)).start();
+    }
+
+    ////////////////////////////////addMultiThreadDebug////////////////////////////////////////////////////////////////////////////
+    public void addMultiThreadDebug(){
+        Log.i(TAG, "to addMultiThreadDebug！");
+        new Thread("bruce线程2") {
+            @Override
+            public void run() {
+                Log.i(TAG, "bruce线程2！");
+                //发送一条空的消息，空消息中必需带一个what字段，用于在handler中接收，这里暂时我先写成0
+                mHandlerCallback.sendEmptyMessage(0);
+            }
+        }.start();
+        //StartTimer();
+        //StartAsync();
+        mMainHandler.postDelayed(taskRunnable,1000);//延迟调用
+        Log.i(TAG, "to addMultiThreadDebug end！");
+    }
+		///////////////////////Handler延迟调用/////////////////////////////////////////////////////////////////////////////////////
+
+    private Runnable taskRunnable = new Runnable(){
+        public void run() {
+            //Thread.currentThread().setName("bruce线程3");//main线程
+            mMainHandler.postDelayed(this,1000);//设置延迟时间，此处是time_interval秒
+            //需要执行的代码
+            Log.i(TAG, "bruce线程3  main！");
+        }
+    };
+	//////////////////////////////TimerTask//////////////////////////////////////////////////////////////////////////////
+
     public void StartTimer() {
         if (mTimer == null) {
             mTimerTask = new TimerTask() {
@@ -211,7 +216,7 @@ public class CameraActivity extends AppCompatActivity {
                     Message msg = new Message();
                     msg.what = 1;
                     msg.arg1 = (int) (mTimerID);
-                    handlerTime.sendMessage(msg);
+                    mMainHandler.sendMessage(msg);
                 }
             };
             mTimer = new Timer();
@@ -234,29 +239,13 @@ public class CameraActivity extends AppCompatActivity {
         /**ID重置**/
         mTimerID = 0;
         //这里发送一条只带what空的消息
-        handlerTime.sendEmptyMessage(1);
+        mMainHandler.sendEmptyMessage(1);
     }
-    Handler handlerTime = new Handler() {
-        @Override
-        public void handleMessage(Message msg) {
-            switch (msg.what) {
-            }
-            super.handleMessage(msg);
-        }
-    };
-
-    private Handler handlerTask = new Handler();
-    private Runnable task = new Runnable(){
-        public void run() {
-            //Thread.currentThread().setName("bruce线程3");//main线程
-            handlerTask.postDelayed(this,1000);//设置延迟时间，此处是time_interval秒
-            //需要执行的代码
-            Log.i(TAG, "bruce线程3  main！");
-        }
-    };
-    private Handler mHandler = new Handler(new Handler.Callback() {
+	////////////////////////////////Handler.Callback////////////////////////////////////////////////////////////////////////////		
+    private Handler mHandlerCallback = new Handler(new Handler.Callback() {
         @Override
         public boolean handleMessage(Message msg) {
+        	Log.i(TAG, "bruce mHandlerCallback");
             new Thread("bruce线程1") {
                 @Override
                 public void run() {
@@ -275,7 +264,7 @@ public class CameraActivity extends AppCompatActivity {
         }
     });
 
-    //---------------------------startService---------------------------------------------------
+	/////////////////////////////////////startService///////////////////////////////////////////////////////////////////////
     // 启动Service监听器
     private View.OnClickListener startListener = new View.OnClickListener() {
         @Override
@@ -350,6 +339,7 @@ public class CameraActivity extends AppCompatActivity {
             unbindService(conn);
         }
     };
+		/////////////////////////////////////StartAsync///////////////////////////////////////////////////////////////////////
 
     public void StartAsync() {
         new AsyncTask<Object, Object, Object>() {
