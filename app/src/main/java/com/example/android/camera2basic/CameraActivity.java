@@ -33,20 +33,24 @@ import android.widget.Button;
 import android.widget.Toast;
 import java.util.Timer;
 import java.util.TimerTask;
-
+import android.os.Handler;
+import android.os.HandlerThread;
 public class CameraActivity extends AppCompatActivity {
     public int switchFunc = 0;
     public String TAG = "bruce";
     // 声明Button
     /**Timer对象**/
     Timer mTimer = null;
-
     /**TimerTask对象**/
     TimerTask mTimerTask = null;
-
     /**记录TimerID**/
     int mTimerID = 0;
     private Button startBtn,stopBtn,bindBtn,unbindBtn;
+
+    private static final int EXPRESSION = 2;
+    private static final int RECV_EXPRESSION = 4;
+    Handler mMainHandlerCallback;
+    Handler bruceHandlerThreadSub;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -58,7 +62,7 @@ public class CameraActivity extends AppCompatActivity {
                         .replace(R.id.container, Camera2BasicFragment.newInstance())
                         .commit();
             }
-            addMultiThreadDebug();
+            testMultiThreadDebug();
             //Handler消息传递:子线程到主线程---------------------------------------
             //2018-10-31 08:16:52.218 5310-5330/? I/bruce: start: I am thread=bruce线程SUB1_2_MAIN
             //2018-10-31 08:16:52.251 5310-5310/? I/bruce: I am from Sub thread
@@ -78,20 +82,7 @@ public class CameraActivity extends AppCompatActivity {
             testSub2Sub();
 
         }else if(switchFunc == 1){
-            // 设置当前布局视图
-            setContentView(R.layout.myservice);
-            // 实例化Button
-            startBtn = (Button)findViewById(R.id.startButton01);
-            stopBtn = (Button)findViewById(R.id.stopButton02);
-            bindBtn = (Button)findViewById(R.id.bindButton03);
-            unbindBtn = (Button)findViewById(R.id.unbindButton04);
-
-            // 添加监听器
-            startBtn.setOnClickListener(startListener);//启动Service========================
-            stopBtn.setOnClickListener(stopListener);
-
-            bindBtn.setOnClickListener(bindListener);// 綁定Service==========================
-            unbindBtn.setOnClickListener(unBindListener);
+            teststartService();
         }
     }
 
@@ -178,23 +169,20 @@ public class CameraActivity extends AppCompatActivity {
     }
 
     ////////////////////////////////addMultiThreadDebug////////////////////////////////////////////////////////////////////////////
-    public void addMultiThreadDebug(){
+    public void testMultiThreadDebug(){
         Log.i(TAG, "to addMultiThreadDebug！");
-        new Thread("bruce线程2") {
-            @Override
-            public void run() {
-                Log.i(TAG, "bruce线程2！");
-                //发送一条空的消息，空消息中必需带一个what字段，用于在handler中接收，这里暂时我先写成0
-                mHandlerCallback.sendEmptyMessage(0);
-            }
-        }.start();
-        //StartTimer();
-        //StartAsync();
-        mMainHandler.postDelayed(taskRunnable,1000);//延迟调用
+        testHandlerCallback();
+        //testTimerTask();
+        //testStartAsync();
+        testDelayHandler();
+        testHandlerThread();
         Log.i(TAG, "to addMultiThreadDebug end！");
     }
-		///////////////////////Handler延迟调用/////////////////////////////////////////////////////////////////////////////////////
 
+///////////////////////Handler延迟调用/////////////////////////////////////////////////////////////////////////////////////
+    public void testDelayHandler(){
+        mMainHandler.postDelayed(taskRunnable,1000);//延迟调用
+    }
     private Runnable taskRunnable = new Runnable(){
         public void run() {
             //Thread.currentThread().setName("bruce线程3");//main线程
@@ -204,7 +192,9 @@ public class CameraActivity extends AppCompatActivity {
         }
     };
 	//////////////////////////////TimerTask//////////////////////////////////////////////////////////////////////////////
-
+    public void testTimerTask(){
+        StartTimer();
+    }
     public void StartTimer() {
         if (mTimer == null) {
             mTimerTask = new TimerTask() {
@@ -241,7 +231,17 @@ public class CameraActivity extends AppCompatActivity {
         //这里发送一条只带what空的消息
         mMainHandler.sendEmptyMessage(1);
     }
-	////////////////////////////////Handler.Callback////////////////////////////////////////////////////////////////////////////		
+	////////////////////////////////Handler.Callback////////////////////////////////////////////////////////////////////////////
+    public void testHandlerCallback(){
+        new Thread("bruce线程2") {
+            @Override
+            public void run() {
+                Log.i(TAG, "bruce线程2！");
+                //发送一条空的消息，空消息中必需带一个what字段，用于在handler中接收，这里暂时我先写成0
+                mHandlerCallback.sendEmptyMessage(0);
+            }
+        }.start();
+    }
     private Handler mHandlerCallback = new Handler(new Handler.Callback() {
         @Override
         public boolean handleMessage(Message msg) {
@@ -263,8 +263,52 @@ public class CameraActivity extends AppCompatActivity {
             return false;
         }
     });
+    ////////////////////////////////HandlerThread////////////////////////////////////////////////////////////////////////////
+    public void testHandlerThread(){
+        mMainHandlerCallback = new Handler(getMainLooper());
+        HandlerThread bruceHandlerThread = new HandlerThread("bruceHandlerThread");
+        bruceHandlerThread.start();
+        bruceHandlerThreadSub =  new Handler(bruceHandlerThread.getLooper());
+        bruceHandlerThreadSub.sendEmptyMessage(EXPRESSION);
+    }
+    public boolean handleMessage(Message msg) {
+        //单独线程处理消息
+        switch(msg.what){
+            case EXPRESSION:
+                //处理表情
+                Log.i(TAG,"收到表情消息");
+                mMainHandlerCallback.sendEmptyMessage(RECV_EXPRESSION);
+                break;
+            case RECV_EXPRESSION:
+                //主线程界面出现提示框
+                Log.i(TAG,"收到子线程发来的消息");
+                Toast.makeText(getApplicationContext(), "收到子线程打来的消息", Toast.LENGTH_SHORT).show();
+                break;
+            default:
+                break;
+        }
+        //回收消息对象
+        //		msg.recycle();此行代码会带来异常
+        return true;
+    }
 
 	/////////////////////////////////////startService///////////////////////////////////////////////////////////////////////
+    public void teststartService(){
+        // 设置当前布局视图
+        setContentView(R.layout.myservice);
+        // 实例化Button
+        startBtn = (Button)findViewById(R.id.startButton01);
+        stopBtn = (Button)findViewById(R.id.stopButton02);
+        bindBtn = (Button)findViewById(R.id.bindButton03);
+        unbindBtn = (Button)findViewById(R.id.unbindButton04);
+
+        // 添加监听器
+        startBtn.setOnClickListener(startListener);//启动Service========================
+        stopBtn.setOnClickListener(stopListener);
+
+        bindBtn.setOnClickListener(bindListener);// 綁定Service==========================
+        unbindBtn.setOnClickListener(unBindListener);
+    }
     // 启动Service监听器
     private View.OnClickListener startListener = new View.OnClickListener() {
         @Override
@@ -339,8 +383,10 @@ public class CameraActivity extends AppCompatActivity {
             unbindService(conn);
         }
     };
-		/////////////////////////////////////StartAsync///////////////////////////////////////////////////////////////////////
-
+    /////////////////////////////////////StartAsync///////////////////////////////////////////////////////////////////////
+    public void testStartAsync(){
+        StartAsync();
+    }
     public void StartAsync() {
         new AsyncTask<Object, Object, Object>() {
             @Override
