@@ -11,26 +11,6 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 
-//ThreadLocal 是个更神奇的东西，可以一个实例走遍所有Looper 和线程。啥意思？就是你在主线中，通过ThreadLocal的对象，取出来的Looper是主线程的。用同一个实例对象，在子线程中，调用同一个方法，取出来的是子线程的Looper .
-//Handler其实根本不在乎自己在哪里。主要是Looper在哪个线程里。
-//Handler是个神奇的东西，可以在线程中畅行无阻。你可以在主线程中创建子线程的Handler，也可以在子线程中创建主线程的Handler. 就是这么神奇。
-//如果没有指定Looper，那么Looper就是当前线程的Looper，如果指定了Looper，那就不一定是当前线程的Looper了。那么这个时候Handler所在线程就得随着Looper而改变了。
-/**
- * Returns the application's main looper, which lives in the main thread of the application.
-public static Looper getMainLooper() {
-synchronized (Looper.class) {
-		return sMainLooper;
- 	}
- }
- */
-
-/**
- * Return the Looper object associated with the current thread.  Returns
- * null if the calling thread is not associated with a Looper.
-public static @Nullable Looper myLooper() {
-		return sThreadLocal.get();
-		}
- */
 class Runnable1 implements Runnable {
 	Handler handler;
 	public String TAG = "bruce";
