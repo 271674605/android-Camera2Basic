@@ -124,7 +124,7 @@ public class CameraActivity extends AppCompatActivity {
         Log.i(TAG, "onDestroy------------------------------>");
     }
 
-//////////////////////testSub2Sub/////testMain2Sub//////testSub2Main///////////////////////////////////////////////////////////////////////////
+//////////////////////testSub2Sub/////testMain2Sub//////testSub2Main////主线程和子线程相互通信///////////////////////////////////////////////////////////////////////
     private Handler mMainHandler = new Handler(){
         @Override
         public void handleMessage(Message msg) {
@@ -132,6 +132,11 @@ public class CameraActivity extends AppCompatActivity {
             if(msg.what==Constants.SUB1_2_MAIN){
                 Log.i(TAG, "I am from Sub thread");
                 Log.i(TAG, "I am thread="+Thread.currentThread().getName());
+            }
+            if(isMainThread()){
+                Log.i(TAG, "mMainHandler Now is Main Thread");
+            }else{
+                Log.i(TAG, "mMainHandler Now is now Main Thread");
             }
         }
     };
@@ -188,10 +193,10 @@ public class CameraActivity extends AppCompatActivity {
             //Thread.currentThread().setName("bruce线程3");//main线程
             mMainHandler.postDelayed(this,1000);//设置延迟时间，此处是time_interval秒
             //需要执行的代码
-            Log.i(TAG, "bruce线程3  main！");
+            Log.i(TAG, "MainHandler.postDelayed bruce线程3  main！");
         }
     };
-	//////////////////////////////TimerTask//////////////////////////////////////////////////////////////////////////////
+	//////////////////////////////TimerTask开启线程//////////////////////////////////////////////////////////////////////////////
     public void testTimerTask(){
         StartTimer();
     }
@@ -231,12 +236,12 @@ public class CameraActivity extends AppCompatActivity {
         //这里发送一条只带what空的消息
         mMainHandler.sendEmptyMessage(1);
     }
-	////////////////////////////////Handler.Callback////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////Handler.Callback: Handler使用Callback接口////////////////////////////////////////////////////////////////////////////
     public void testHandlerCallback(){
         new Thread("bruce线程2") {
             @Override
             public void run() {
-                Log.i(TAG, "bruce线程2！");
+                Log.i(TAG, "Handler.Callback  bruce线程2！");
                 //发送一条空的消息，空消息中必需带一个what字段，用于在handler中接收，这里暂时我先写成0
                 mHandlerCallback.sendEmptyMessage(0);
             }
@@ -245,11 +250,11 @@ public class CameraActivity extends AppCompatActivity {
     private Handler mHandlerCallback = new Handler(new Handler.Callback() {
         @Override
         public boolean handleMessage(Message msg) {
-        	Log.i(TAG, "bruce mHandlerCallback");
+        	Log.i(TAG, "Handler.Callback  bruce handleMessage");
             new Thread("bruce线程1") {
                 @Override
                 public void run() {
-                    Log.i(TAG, "bruce线程1！");
+                    Log.i(TAG, "Handler.Callback  bruce线程1！");
                     //如果handler不指定looper的话，默认为mainlooper来进行消息循环，而当前是在一个新的线程中它没有默认的looper
                     //所以我们须要手动调用prepare()拿到他的loop，可以理解为在Thread创建Looper的消息队列
                     Looper.prepare();
@@ -258,12 +263,17 @@ public class CameraActivity extends AppCompatActivity {
                     Looper.loop();
                     //如果没有   Looper.prepare();  与 Looper.loop();会抛出异常Can't create handler inside thread that has not called Looper.prepare()
                     //原因是我们新起的线程中是没有默认的looper所以须要手动调用prepare()拿到他的loop
+                    if(isMainThread()){
+                        Log.i(TAG, "Handler.Callback Now is Main Thread");
+                    }else{
+                        Log.i(TAG, "Handler.Callback Now is now Main Thread");
+                    }
                 }
             }.start();
             return false;
         }
     });
-    ////////////////////////////////HandlerThread////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////HandlerThread方式开启线程////////////////////////////////////////////////////////////////////////////
     public void testHandlerThread(){
         mMainHandlerCallback = new Handler(getMainLooper());
         HandlerThread bruceHandlerThread = new HandlerThread("bruceHandlerThread");
@@ -276,12 +286,12 @@ public class CameraActivity extends AppCompatActivity {
         switch(msg.what){
             case EXPRESSION:
                 //处理表情
-                Log.i(TAG,"收到表情消息");
+                Log.i(TAG,"HandlerThread 收到表情消息");
                 mMainHandlerCallback.sendEmptyMessage(RECV_EXPRESSION);
                 break;
             case RECV_EXPRESSION:
                 //主线程界面出现提示框
-                Log.i(TAG,"收到子线程发来的消息");
+                Log.i(TAG,"HandlerThread 收到子线程发来的消息");
                 Toast.makeText(getApplicationContext(), "收到子线程打来的消息", Toast.LENGTH_SHORT).show();
                 break;
             default:
@@ -292,7 +302,7 @@ public class CameraActivity extends AppCompatActivity {
         return true;
     }
 
-	/////////////////////////////////////startService///////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////startService开启后台服务///////////////////////////////////////////////////////////////////////
     public void teststartService(){
         // 设置当前布局视图
         setContentView(R.layout.myservice);
@@ -313,7 +323,7 @@ public class CameraActivity extends AppCompatActivity {
     private View.OnClickListener startListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
-            Log.i(TAG, "to start！");
+            Log.i(TAG, "startService to start！");
             // 创建Intent
             Intent intent = new Intent();
             // 设置Action属性
@@ -328,7 +338,7 @@ public class CameraActivity extends AppCompatActivity {
     private View.OnClickListener stopListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
-            Log.i(TAG, "to stop！");
+            Log.i(TAG, "startService to stop！");
             // 创建Intent
             Intent intent = new Intent();
             // 设置Action属性
@@ -343,12 +353,12 @@ public class CameraActivity extends AppCompatActivity {
     private ServiceConnection conn = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
-            Log.i(TAG, "Connected！");
+            Log.i(TAG, "bindService Connected！");
             Toast.makeText(CameraActivity.this, "Connected！", Toast.LENGTH_LONG).show();
         }
         @Override
         public void onServiceDisconnected(ComponentName name) {
-            Log.i(TAG, "Disconnect！");
+            Log.i(TAG, "bindService Disconnect！");
             Toast.makeText(CameraActivity.this, "Disconnect！", Toast.LENGTH_LONG).show();
         }
     };
@@ -357,7 +367,7 @@ public class CameraActivity extends AppCompatActivity {
     private View.OnClickListener bindListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
-            Log.i(TAG, "to Bind！");
+            Log.i(TAG, "bindService to Bind！");
             // 创建Intent
             Intent intent = new Intent();
             // 设置Action属性
@@ -373,7 +383,7 @@ public class CameraActivity extends AppCompatActivity {
     private View.OnClickListener unBindListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
-            Log.i(TAG, "to unBind！");
+            Log.i(TAG, "bindService to unBind！");
             // 创建Intent
             Intent intent = new Intent();
             // 设置Action属性
@@ -383,7 +393,7 @@ public class CameraActivity extends AppCompatActivity {
             unbindService(conn);
         }
     };
-    /////////////////////////////////////StartAsync///////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////AsyncTask开启线程///////////////////////////////////////////////////////////////////////
     public void testStartAsync(){
         StartAsync();
     }
@@ -392,7 +402,7 @@ public class CameraActivity extends AppCompatActivity {
             @Override
             protected void onPreExecute() {
                 //首先执行这个方法，它在UI线程中 可以执行一些异步操作
-                Log.i(TAG, "开始加载进度！");
+                Log.i(TAG, "AsyncTask 开始加载进度！");
                 super.onPreExecute();
             }
 
@@ -414,9 +424,20 @@ public class CameraActivity extends AppCompatActivity {
             @Override
             protected void onProgressUpdate(Object... values) {
                 //时时拿到当前的进度更新UI
-                Log.i(TAG, "当前加载进度！");
+                Log.i(TAG, "AsyncTask 当前加载进度！");
                 super.onProgressUpdate(values);
             }
         }.execute();//可以理解为执行 这个AsyncTask
     }
+    /////////////////////////////////////判断是否为主线程：isMainThread///////////////////////////////////////////////////////////////////////
+    public boolean isMainThread() {
+        return Looper.getMainLooper() == Looper.myLooper();
+    }
+    public boolean isMainThread2() {
+        return Looper.getMainLooper().getThread() == Thread.currentThread();
+    }
+    public boolean isMainThread1() {
+        return Looper.getMainLooper().getThread().getId() == Thread.currentThread().getId();
+    }
+    /////////////////////////////////////isMainThread///////////////////////////////////////////////////////////////////////
 }
