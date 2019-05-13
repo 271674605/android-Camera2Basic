@@ -63,6 +63,8 @@ public class CameraActivity extends AppCompatActivity {
                         .commit();
             }
             CreatThreadByAllMethod();
+            CreatHandlerByAllMethod();
+            CreatHandlerInThreadByAllMethod();
             testMainAndSubThreadSendMessage();
         }else if(switchFunc == 1){
             teststartService();
@@ -521,6 +523,89 @@ public class CameraActivity extends AppCompatActivity {
         }.execute();//可以理解为执行 这个AsyncTask
     }
 
+    /////////////////////////////////////线程中创建handler所有方式：CreatHandlerByAllMethod()//////////////////////////////////////////////////////////////////////
+    public void CreatHandlerByAllMethod(){
+        CreatHandlerByAllMethod1();
+        CreatHandlerByAllMethod2();
+    }
+    /////////////////////////////////////线程中创建handler方式1：CreatHandlerByAllMethod1()///////////////////////////////////////////////////////////////////////
+    public void CreatHandlerByAllMethod1(){//1.方法1（创建Handler实例，重载handleMessage方法，来处理消息。）
+        Handler HandlerByAllMethod1 = new Handler(){
+            @Override
+            public void handleMessage(Message msg) {
+                Toast.makeText(getApplicationContext(), "handler msg", Toast.LENGTH_LONG).show();
+            }
+        };
+        HandlerByAllMethod1.sendEmptyMessage(0);
+    }
+    /////////////////////////////////////线程中创建handler方式2：CreatHandlerByAllMethod2()///////////////////////////////////////////////////////////////////////
+    public void CreatHandlerByAllMethod2(){//2.方法2 :继承自Handler，相同要实现handleMessage(Message msg)方法。
+        Handler mHandlerByAllMethod2 =  new HandlerByAllMethod2(getMainLooper());
+        mHandlerByAllMethod2.sendEmptyMessage(EXPRESSION);
+    }
+    public class HandlerByAllMethod2 extends Handler {
+
+        public HandlerByAllMethod2(Looper looper) {
+            super(looper);
+        }
+        @Override
+        public void handleMessage(Message msg) {
+            int id = msg.arg1;
+            switch (msg.what) {
+                case EXPRESSION:
+                    //处理表情
+                    Log.i(TAG,"HandlerThread 收到表情消息");
+                    mMainHandlerCallback.sendEmptyMessage(RECV_EXPRESSION);
+                    break;
+                case RECV_EXPRESSION:
+                    //主线程界面出现提示框
+                    Log.i(TAG,"HandlerThread 收到子线程发来的消息");
+                    Toast.makeText(getApplicationContext(), "收到子线程打来的消息", Toast.LENGTH_SHORT).show();
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+    /////////////////////////////////////线程中创建handler所有方式：CreatHandlerInThreadByAllMethod()//////////////////////////////////////////////////////////////////////
+    public void CreatHandlerInThreadByAllMethod(){
+        CreatHandlerInThreadByAllMethod1();
+        CreatHandlerInThreadByAllMethod2();
+    }
+    /////////////////////////////////////线程中创建handler方式1：CreatHandlerInThreadByAllMethod1()///////////////////////////////////////////////////////////////////////
+    public void CreatHandlerInThreadByAllMethod1(){//1.方法1（直接获取当前子线程的looper）
+        new Thread(new Runnable() {
+            public void run() {
+                Thread.currentThread().setName("bruce handler1");
+                Looper.prepare();// 此处获取到当前线程的Looper，并且prepare()
+                Handler handler = new Handler(){
+                    @Override
+                    public void handleMessage(Message msg) {
+                        Toast.makeText(getApplicationContext(), "handler msg", Toast.LENGTH_LONG).show();
+                    }
+                };
+                handler.sendEmptyMessage(1);
+                Looper.loop();
+            };
+        }).start();
+
+    }
+    /////////////////////////////////////线程中创建handler方式2：CreatHandlerInThreadByAllMethod2()///////////////////////////////////////////////////////////////////////
+    public void CreatHandlerInThreadByAllMethod2(){//2.方法2（获取主线程的looper，或者说是UI线程的looper）
+        new Thread(new Runnable() {
+            public void run() {
+                Thread.currentThread().setName("bruce handler2");
+                Handler handler = new Handler(Looper.getMainLooper()){ // 区别在这！！！！
+                    @Override
+                    public void handleMessage(Message msg) {
+                        Toast.makeText(getApplicationContext(), "handler msg", Toast.LENGTH_LONG).show();
+                    }
+                };
+                handler.sendEmptyMessage(1);
+            };
+        }).start();
+
+    }
     /////////////////////////////////////startService开启后台服务///////////////////////////////////////////////////////////////////////
     public void teststartService(){
         // 设置当前布局视图
