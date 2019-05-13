@@ -26,6 +26,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
+import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
@@ -33,6 +34,14 @@ import android.widget.Button;
 import android.widget.Toast;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
 import android.os.Handler;
 import android.os.HandlerThread;
 public class CameraActivity extends AppCompatActivity {
@@ -46,7 +55,7 @@ public class CameraActivity extends AppCompatActivity {
     /**记录TimerID**/
     int mTimerID = 0;
     private Button startBtn,stopBtn,bindBtn,unbindBtn;
-
+    HandlerThread bruceHandlerThread;
     private static final int EXPRESSION = 2;
     private static final int RECV_EXPRESSION = 4;
     Handler mMainHandlerCallback;
@@ -63,6 +72,7 @@ public class CameraActivity extends AppCompatActivity {
                         .commit();
             }
             CreatThreadByAllMethod();
+            CreatThreadPoolByAllMethod();
             CreatHandlerByAllMethod();
             CreatHandlerInThreadByAllMethod();
             testMainAndSubThreadSendMessage();
@@ -106,6 +116,11 @@ public class CameraActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         mMainHandler.removeCallbacks(taskRunnable);
+        DestroyThreadByMethod6();
+        if (mMainHandler!=null){
+            mMainHandler.removeMessages(3);
+        }
+        mMainHandler.getLooper().quitSafely();//Handler可能会处理延时消息，这时候如果Activity已经finish了，mHandler释放，执行消息则会导致程序崩溃。
         Log.i(TAG, "onDestroy------------------------------>");
     }
 
@@ -358,7 +373,7 @@ public class CameraActivity extends AppCompatActivity {
     ////////////////////////////////创建线程方式6：CreatThreadByMethod6: HandlerThread方式开启线程////////////////////////////////////////////////////////////////////////////
     public void CreatThreadByMethod6(){//6、HandlerThread方式开启线程
         mMainHandlerCallback = new Handler(getMainLooper());
-        HandlerThread bruceHandlerThread = new HandlerThread("ruce线程6:bruceHandlerThread");
+        bruceHandlerThread = new HandlerThread("ruce线程6:bruceHandlerThread");
         bruceHandlerThread.start();
         mBruceHandlerThreadSub =  new bruceHandlerThreadSub(bruceHandlerThread.getLooper());//获取bruceHandlerThread的Loop，通过它创建bruceHandlerThread的Handler
         mBruceHandlerThreadSub.sendEmptyMessage(EXPRESSION);
@@ -388,6 +403,19 @@ public class CameraActivity extends AppCompatActivity {
             }
         }
     }
+    public void DestroyThreadByMethod6(){
+        if (bruceHandlerThread != null)
+            bruceHandlerThread.quitSafely();
+        try {
+            if (bruceHandlerThread != null) {
+                bruceHandlerThread.join();
+                bruceHandlerThread = null;
+            }
+            mBruceHandlerThreadSub = null;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
     /////////////////////////////////////创建线程方式7：CreatThreadByMethod7///////////////////////////////////////////////////////////////////////
     public void CreatThreadByMethod7(){//7、启用方式通过Handler启动线程
         mMainHandler.postDelayed(taskRunnable,1000);//延迟调用，//给自己发送消息，自运行
@@ -401,10 +429,7 @@ public class CameraActivity extends AppCompatActivity {
         }
     };
     /////////////////////////////////////创建线程方式8：CreatThreadByMethod8///////////////////////////////////////////////////////////////////////
-    //线程池
     public void CreatThreadByMethod8(){
-
-
 
 
     }
@@ -525,27 +550,27 @@ public class CameraActivity extends AppCompatActivity {
 
     /////////////////////////////////////线程中创建handler所有方式：CreatHandlerByAllMethod()//////////////////////////////////////////////////////////////////////
     public void CreatHandlerByAllMethod(){
-        CreatHandlerByAllMethod1();
-        CreatHandlerByAllMethod2();
+        CreatHandlerByMethod1();
+        CreatHandlerByMethod2();
     }
     /////////////////////////////////////线程中创建handler方式1：CreatHandlerByAllMethod1()///////////////////////////////////////////////////////////////////////
-    public void CreatHandlerByAllMethod1(){//1.方法1（创建Handler实例，重载handleMessage方法，来处理消息。）
-        Handler HandlerByAllMethod1 = new Handler(){
+    public void CreatHandlerByMethod1(){//1.方法1（创建Handler实例，重载handleMessage方法，来处理消息。）
+        Handler HandlerByMethod1 = new Handler(){
             @Override
             public void handleMessage(Message msg) {
                 Toast.makeText(getApplicationContext(), "handler msg", Toast.LENGTH_LONG).show();
             }
         };
-        HandlerByAllMethod1.sendEmptyMessage(0);
+        HandlerByMethod1.sendEmptyMessage(0);
     }
     /////////////////////////////////////线程中创建handler方式2：CreatHandlerByAllMethod2()///////////////////////////////////////////////////////////////////////
-    public void CreatHandlerByAllMethod2(){//2.方法2 :继承自Handler，相同要实现handleMessage(Message msg)方法。
-        Handler mHandlerByAllMethod2 =  new HandlerByAllMethod2(getMainLooper());
-        mHandlerByAllMethod2.sendEmptyMessage(EXPRESSION);
+    public void CreatHandlerByMethod2(){//2.方法2 :继承自Handler，相同要实现handleMessage(Message msg)方法。
+        Handler mHandlerByMethod2 =  new HandlerByMethod2(getMainLooper());
+        mHandlerByMethod2.sendEmptyMessage(EXPRESSION);
     }
-    public class HandlerByAllMethod2 extends Handler {
+    public class HandlerByMethod2 extends Handler {
 
-        public HandlerByAllMethod2(Looper looper) {
+        public HandlerByMethod2(Looper looper) {
             super(looper);
         }
         @Override
@@ -569,11 +594,11 @@ public class CameraActivity extends AppCompatActivity {
     }
     /////////////////////////////////////线程中创建handler所有方式：CreatHandlerInThreadByAllMethod()//////////////////////////////////////////////////////////////////////
     public void CreatHandlerInThreadByAllMethod(){
-        CreatHandlerInThreadByAllMethod1();
-        CreatHandlerInThreadByAllMethod2();
+        CreatHandlerInThreadByMethod1();
+        CreatHandlerInThreadByMethod2();
     }
     /////////////////////////////////////线程中创建handler方式1：CreatHandlerInThreadByAllMethod1()///////////////////////////////////////////////////////////////////////
-    public void CreatHandlerInThreadByAllMethod1(){//1.方法1（直接获取当前子线程的looper）
+    public void CreatHandlerInThreadByMethod1(){//1.方法1（直接获取当前子线程的looper）
         new Thread(new Runnable() {
             public void run() {
                 Thread.currentThread().setName("bruce handler1");
@@ -591,7 +616,7 @@ public class CameraActivity extends AppCompatActivity {
 
     }
     /////////////////////////////////////线程中创建handler方式2：CreatHandlerInThreadByAllMethod2()///////////////////////////////////////////////////////////////////////
-    public void CreatHandlerInThreadByAllMethod2(){//2.方法2（获取主线程的looper，或者说是UI线程的looper）
+    public void CreatHandlerInThreadByMethod2(){//2.方法2（获取主线程的looper，或者说是UI线程的looper）
         new Thread(new Runnable() {
             public void run() {
                 Thread.currentThread().setName("bruce handler2");
@@ -606,6 +631,242 @@ public class CameraActivity extends AppCompatActivity {
         }).start();
 
     }
+
+    /////////////////////////////////////线程池创建所有方式：//////////////////////////////////////////////////////////////////////
+    /*
+    一：使用线程池的原因
+在android开发中经常会使用多线程异步来处理相关任务，而如果用传统的newThread来创建一个子线程进行处理，会造成一些严重的问题：
+1：在任务众多的情况下，系统要为每一个任务创建一个线程，而任务执行完毕后会销毁每一个线程，所以会造成线程频繁地创建与销毁。
+2：多个线程频繁地创建会占用大量的资源，并且在资源竞争的时候就容易出现问题，同时这么多的线程缺乏一个统一的管理，容易造成界面的卡顿。
+3:多个线程频繁地销毁，会频繁地调用GC机制，这会使性能降低，又非常耗时。
+总而言之：频繁地为每一个任务创建一个线程，缺乏统一管理，降低性能，并且容易出现问题。
+为了解决这些问题，就要用到今天的主角——线程池.
+线程池使用的好处：
+1：对多个线程进行统一地管理，避免资源竞争中出现的问题。
+2：（重点）：对线程进行复用，线程在执行完任务后不会立刻销毁，而会等待另外的任务，这样就不会频繁地创建、销毁线程和调用GC。
+3：JAVA提供了一套完整的ExecutorService线程池创建的api，可创建多种功能不一的线程池，使用起来很方便。
+
+四：各个线程池总结及适用场景
+newCachedThreadPool：
+底层：返回ThreadPoolExecutor实例，corePoolSize为0；maximumPoolSize为Integer.MAX_VALUE；keepAliveTime为60L；unit为TimeUnit.SECONDS；workQueue为SynchronousQueue(同步队列)
+通俗：当有新任务到来，则插入到SynchronousQueue中，由于SynchronousQueue是同步队列，因此会在池中寻找可用线程来执行，若有可以线程则执行，若没有可用线程则创建一个线程来执行该任务；若池中线程空闲时间超过指定大小，则该线程会被销毁。
+适用：执行很多短期异步的小程序或者负载较轻的服务器
+newFixedThreadPool：
+底层：返回ThreadPoolExecutor实例，接收参数为所设定线程数量nThread，corePoolSize为nThread，maximumPoolSize为nThread；keepAliveTime为0L(不限时)；unit为：TimeUnit.MILLISECONDS；WorkQueue为：new LinkedBlockingQueue<Runnable>() 无解阻塞队列
+通俗：创建可容纳固定数量线程的池子，每隔线程的存活时间是无限的，当池子满了就不再添加线程了；如果池中的所有线程均在繁忙状态，对于新任务会进入阻塞队列中(无界的阻塞队列)
+适用：执行长期的任务，性能好很多
+newSingleThreadExecutor:
+底层：FinalizableDelegatedExecutorService包装的ThreadPoolExecutor实例，corePoolSize为1；maximumPoolSize为1；keepAliveTime为0L；unit为：TimeUnit.MILLISECONDS；workQueue为：new LinkedBlockingQueue<Runnable>() 无解阻塞队列
+通俗：创建只有一个线程的线程池，且线程的存活时间是无限的；当该线程正繁忙时，对于新任务会进入阻塞队列中(无界的阻塞队列)
+适用：一个任务一个任务执行的场景
+NewScheduledThreadPool:
+底层：创建ScheduledThreadPoolExecutor实例，corePoolSize为传递来的参数，maximumPoolSize为Integer.MAX_VALUE；keepAliveTime为0；unit为：TimeUnit.NANOSECONDS；workQueue为：new DelayedWorkQueue() 一个按超时时间升序排序的队列
+通俗：创建一个固定大小的线程池，线程池内线程存活时间无限制，线程池可以支持定时及周期性任务执行，如果所有线程均处于繁忙状态，对于新任务会进入DelayedWorkQueue队列中，这是一种按照超时时间排序的队列结构
+适用：周期性执行任务的场景
+
+     */
+    public void CreatThreadPoolByAllMethod(){
+        CreatThreadPoolByMethod1();//1：ThreadPoolExecutor 创建基本线程池
+        CreatThreadPoolByMethod2();//2：FixedThreadPool (可重用固定线程数)
+        CreatThreadPoolByMethod3();//3：CachedThreadPool (按需创建)
+        CreatThreadPoolByMethod4();//4：SingleThreadPool(单个核线的fixed)
+        CreatThreadPoolByMethod5();//5：ScheduledThreadPool(定时延时执行)
+        CreatThreadPoolByMethod6();//6：自定义的PriorityThreadPool(队列中有优先级比较的线程池)
+    }
+    /////////////////////////////////////线程池创建方式1：///////////////////////////////////////////////////////////////////////
+    public void CreatThreadPoolByMethod1() {//1：ThreadPoolExecutor 创建基本线程池
+        for (int i = 0; i < 30; i++) {
+            final int finali = i;
+            Runnable runnable = new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Thread.sleep(2000);//线程休眠2秒
+                        Log.d("Thread", "run: " + finali);
+                        Log.d("当前线程：", Thread.currentThread().getName());
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            };
+            threadPoolExecutor.execute(runnable);
+        }
+    }
+    final ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(3,5,1, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<Runnable>(100));    //创建基本线程池
+/*
+结果会每2s打印三个日志。
+具体过程：
+1.execute一个线程之后，如果线程池中的线程数未达到核心线程数，则会立马启用一个核心线程去执行。
+2.execute一个线程之后，如果线程池中的线程数已经达到核心线程数，且workQueue未满，则将新线程放入workQueue中等待执行。
+3.execute一个线程之后，如果线程池中的线程数已经达到核心线程数但未超过非核心线程数，且workQueue已满，则开启一个非核心线程来执行任务。
+4.execute一个线程之后，如果线程池中的线程数已经超过非核心线程数，则拒绝执行该任务，采取饱和策略，并抛出RejectedExecutionException异常。
+demo中设置的任务队列长度为100，所以不会开启额外的5-3=2个非核心线程，如果将任务队列设为25，则前三个任务被核心线程执行，剩下的30-3=27个任务进入队列会满，此时会开启2个非核心线程来执行剩下的两个任务。
+//新开启了thread-4与thread-5执行剩下的超出队列的两个任务28和29
+2019-03-28 15:54:07.879 22284-22618/com.example.threadpooltest D/Thread:: 1
+2019-03-28 15:54:07.879 22284-22617/com.example.threadpooltest D/Thread:: 0
+2019-03-28 15:54:07.879 22284-22617/com.example.threadpooltest D/当前线程：: pool-1-thread-1
+2019-03-28 15:54:07.879 22284-22618/com.example.threadpooltest D/当前线程：: pool-1-thread-2
+2019-03-28 15:54:07.880 22284-22619/com.example.threadpooltest D/Thread:: 2
+2019-03-28 15:54:07.880 22284-22619/com.example.threadpooltest D/当前线程：: pool-1-thread-3
+2019-03-28 15:54:07.881 22284-22620/com.example.threadpooltest D/Thread:: 28
+2019-03-28 15:54:07.881 22284-22620/com.example.threadpooltest D/当前线程：: pool-1-thread-4
+2019-03-28 15:54:07.881 22284-22621/com.example.threadpooltest D/Thread:: 29
+2019-03-28 15:54:07.881 22284-22621/com.example.threadpooltest D/当前线程：: pool-1-thread-5
+
+疑问：每个for循环里都有一个sleep（2000），为何会每隔2s打印三个任务？
+原因：因为一开始的时候只是声明runnable对象并且重写run()方法，并没有运行，而后execute(runnable) 才会sleep，又因为一开始创建线程池的时候声明的核心线程数为3，
+所以会首先开启三个核心线程，然后执行各自的run方法，虽然有先后顺序，但这之间的间隔很短，所以2s后同时打印3个任务。
+ */
+
+    /////////////////////////////////////线程中创建方式2：///////////////////////////////////////////////////////////////////////
+    public void CreatThreadPoolByMethod2(){//2：FixedThreadPool (可重用固定线程数)
+        for(int i = 0;i<30;i++){
+            final int finali = i;
+            Runnable runnable = new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Thread.sleep(2000);
+                        Log.d("Thread", "run: "+finali);
+                        Log.d("当前线程：",Thread.currentThread().getName());
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            };
+            fixedThreadPool.execute(runnable);
+        }
+    }
+    //创建fixed线程池.特点：参数为核心线程数，只有核心线程，无非核心线程，并且阻塞队列无界。
+    final ExecutorService fixedThreadPool = Executors.newFixedThreadPool(5);
+/*
+    结果为每2s打印5次任务，跟上面的基础线程池类似。
+ */
+
+    /////////////////////////////////////线程中创建方式3：///////////////////////////////////////////////////////////////////////
+    public void CreatThreadPoolByMethod3(){//3：CachedThreadPool (按需创建)
+        for(int i = 0;i<30;i++){
+            final int finali = i;
+            Runnable runnable = new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Thread.sleep(2000);
+                        Log.d("Thread", "run: "+finali);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            };
+            cachedThreadPool.execute(runnable);
+
+        }
+    }
+    //创建Cached线程池:特点：没有核心线程，只有非核心线程，并且每个非核心线程空闲等待的时间为60s，采用SynchronousQueue队列。
+    final ExecutorService cachedThreadPool = Executors.newCachedThreadPool();
+/*
+结果：过2s后直接打印30个任务
+结果分析：
+因为没有核心线程，其他全为非核心线程，SynchronousQueue是不存储元素的，每次插入操作必须伴随一个移除操作，一个移除操作也要伴随一个插入操作。
+当一个任务执行时，先用SynchronousQueue的offer提交任务，如果线程池中有线程空闲，则调用SynchronousQueue的poll方法来移除任务并交给线程处理；如果没有线程空闲，则开启一个新的非核心线程来处理任务。
+由于maximumPoolSize是无界的，所以如果线程处理任务速度小于提交任务的速度，则会不断地创建新的线程，这时需要注意不要过度创建，应采取措施调整双方速度，不然线程创建太多会影响性能。
+从其特点可以看出，CachedThreadPool适用于有大量需要立即执行的耗时少的任务的情况。
+ */
+
+    /////////////////////////////////////线程中创建方式：///////////////////////////////////////////////////////////////////////
+    public void CreatThreadPoolByMethod4(){//4：SingleThreadPool(单个核线的fixed)
+        for(int i = 0;i<30;i++){
+            final int finali = i;
+            Runnable runnable = new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Thread.sleep(2000);
+                        Log.d("Thread", "run: "+finali);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            };
+            singleThreadExecutor.execute(runnable);
+        }
+    }
+
+    //创建Single线程池
+    final ExecutorService singleThreadExecutor = Executors.newSingleThreadExecutor();
+/*
+结果：每2s打印一个任务，由于只有一个核心线程，当被占用时，其他的任务需要进入队列等待。
+ */
+    /////////////////////////////////////线程中创建方式：///////////////////////////////////////////////////////////////////////
+    public void CreatThreadPoolByMethod5(){//5：ScheduledThreadPool(定时延时执行)
+        Runnable runnable = new Runnable() {
+            @Override
+            public void run() {
+
+                Log.d("Thread", "This task is delayed to execute");
+            }
+        };
+        scheduledThreadPool.schedule(runnable,10,TimeUnit.SECONDS);//延迟启动任务
+        //scheduledThreadPool.scheduleAtFixedRate(runnable,5,1,TimeUnit.SECONDS);//延迟5s后启动，每1s执行一次
+        //scheduledThreadPool.scheduleWithFixedDelay(runnable,5,1,TimeUnit.SECONDS);//启动后第一次延迟5s执行，后面延迟1s执行
+    }
+    //创建Scheduled线程池
+    final ScheduledExecutorService scheduledThreadPool = Executors.newScheduledThreadPool(3);
+
+    /////////////////////////////////////线程中创建方式：///////////////////////////////////////////////////////////////////////
+    public void CreatThreadPoolByMethod6(){//6：自定义的PriorityThreadPool(队列中有优先级比较的线程池)
+        for(int i = 0;i<30;i++){
+            final int priority = i;
+            priorityThreadPool.execute(new PriorityRunnable(priority) {
+                @Override
+                protected void doSomeThing() {
+                    Log.d("MainActivity", "优先级为 "+priority+"  的任务被执行");
+                    try {
+                        Thread.sleep(2000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
+        }
+    }
+    //创建自定义线程池(优先级线程)
+    final ExecutorService priorityThreadPool = new ThreadPoolExecutor(3,3,0, TimeUnit.SECONDS,new PriorityBlockingQueue<Runnable>());
+    //利用抽象类继承Comparable接口重写其中的compareTo方法来比较优先级。
+    public abstract class PriorityRunnable implements Runnable,Comparable<PriorityRunnable> {
+        private int priority;
+
+        public  PriorityRunnable(int priority){
+            if(priority <0) {
+                throw new IllegalArgumentException();
+            }
+            this.priority = priority;
+        }
+        public int getPriority() {
+            return priority;
+        }
+        @Override
+        public int compareTo(@NonNull PriorityRunnable another) {
+            int me = this.priority;
+            int anotherPri=another.getPriority();
+            return me == anotherPri ? 0 : me < anotherPri ? 1 : -1;
+        }
+        @Override
+        public void run() {
+            doSomeThing();
+        }
+        protected abstract void doSomeThing();
+    }
+/*
+结果：前三个任务被创建的三个核心线程执行，之后的27个任务进入队列并且调用compareTo方法进行排序，之后打印出来的是经过排序后从大到小的顺序。
+ */
+
+
+
+
+
+
     /////////////////////////////////////startService开启后台服务///////////////////////////////////////////////////////////////////////
     public void teststartService(){
         // 设置当前布局视图
