@@ -16,8 +16,10 @@
 
 package com.example.android.camera2basic;
 
+import android.app.IntentService;
 import android.app.Service;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.AsyncTask;
@@ -27,11 +29,16 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
+
+import java.util.Map;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ExecutorService;
@@ -78,6 +85,8 @@ public class CameraActivity extends AppCompatActivity {
             testMainAndSubThreadSendMessage();
             CreatSynchronizedByAllMethod();
             testSynchronizedWaitNotifyAll();
+            testSubThreadCallMainThreadAll();
+            printThreadInProcess();//打印当前进程的所有线程信息
         }else if(switchFunc == 1){
             teststartService();
         }
@@ -315,7 +324,7 @@ public class CameraActivity extends AppCompatActivity {
         CreatThreadByMethod5();//5、如果线程要操作的内容比较少，也可以直接用匿名类方式新建线程，启动线程一气呵成
         CreatThreadByMethod6();//6、HandlerThread方式开启线程
         CreatThreadByMethod7();//7、启用方式通过Handler启动线程
-        CreatThreadByMethod8();//8、线程池
+        CreatThreadByMethod8();//8、启用方式通过IntentService启动线程
         CreatThreadByMethod9();//9、Handler.Callback: Handler使用Callback接口
         CreatThreadByMethod10();//10、TimerTask开启线程
         CreatThreadByMethod11();//11、AsyncTask开启线程
@@ -457,11 +466,28 @@ Runnable 接口的类的实例。
         }
     };
     /////////////////////////////////////创建线程方式8：CreatThreadByMethod8///////////////////////////////////////////////////////////////////////
-    public void CreatThreadByMethod8(){
-
-
+    public void CreatThreadByMethod8(){//8、启用方式通过IntentService启动线程
+        Intent intent = new Intent(this, MyIntentService.class);
+        Bundle bundle = new Bundle();
+        bundle.putString("1","one");
+        startService(intent);
     }
-
+    class MyIntentService extends IntentService {
+        /**
+         * Creates an IntentService.  Invoked by your subclass's constructor.
+         * @param name Used to name the worker thread, important only for debugging.
+         */
+        public MyIntentService(String name) {
+            //此处可以做点准备工作什么的
+            super(name);
+        }
+        @Override
+        protected void onHandleIntent(@Nullable Intent intent) {
+            //此处已经在IntentService开启的内部线程处理了
+            Log.d("IntentServiceTest", (String) intent.getExtras().get("1"));
+            //此处怎么把处理好的消息返回给Ui线程呢？两种方法1：本地广播2：handler（此处不述）
+        }
+    }
     ////////////////////////////////创建线程方式9：CreatThreadByMethod9:Handler.Callback: Handler使用Callback接口////////////////////////////////////////////////////////////////////////////
     public void CreatThreadByMethod9(){//Handler.Callback: Handler使用Callback接口
         new Thread("bruce线程9:CreatThreadByMethod9") {
@@ -916,12 +942,12 @@ synchronized修饰方法和修饰一个代码块类似，只是作用范围不�
         }
     }
     /////////////////////////////////////创建synchronized方式3：///////////////////////////////////////////////////////////////////////
-    public static synchronized void CreatSynchronizedByMethod3() {//静态方法，锁住的是类对象，即将会锁住整个类
+    public static synchronized void CreatSynchronizedByMethod3() {//静态方法，锁住的是类对象，即将会锁住整个类的所有对象。
 
     }
     /////////////////////////////////////创建synchronized方式4：///////////////////////////////////////////////////////////////////////
     private static int count = 0;
-    public void CreatSynchronizedByMethod4() {//同步代码块，锁住的是该类的类对象
+    public void CreatSynchronizedByMethod4() {//同步代码块，锁住的是该类的类对象，即将会锁住整个类的所有对象。
         for (int i = 0; i < 10; i++) {
             Thread thread = new Thread(new CreatSynchronizedByMethod4Runnable());//开启十个线程
             thread.start();
@@ -936,7 +962,7 @@ synchronized修饰方法和修饰一个代码块类似，只是作用范围不�
     class CreatSynchronizedByMethod4Runnable implements Runnable{
         @Override
         public void run() {
-            synchronized (CameraActivity.class) {//同步代码块，锁住的是该类的类对象，即将会锁住整个类
+            synchronized (CameraActivity.class) {//同步代码块，锁住的是该类的类对象，即将会锁住整个类的所有对象。
                 for (int i = 0; i < 1000; i++)
                     count++;
             }
@@ -952,6 +978,10 @@ synchronized修饰方法和修饰一个代码块类似，只是作用范围不�
 
      */
     /////////////////////////////////////创建synchronized方式5：///////////////////////////////////////////////////////////////////////
+/*
+1）一个线程访问一个对象中的synchronized(this)同步代码块时，其他试图访问该对象的线程将被阻塞
+2）当一个线程访问对象的一个synchronized(this)同步代码块时，另一个线程仍然可以访问该对象中的非synchronized(this)同步代码块。
+ */
     final Object mObject = new Object();
     public void CreatSynchronizedByMethod5() {//同步代码块，锁住的是配置的实例对象mObject
         synchronized (mObject){ // 锁定了synchronized{}整个大括号里的内容。
@@ -962,6 +992,8 @@ synchronized修饰方法和修饰一个代码块类似，只是作用范围不�
     public void testSynchronizedWaitNotifyAll(){
         testSynchronizedWaitNotify();//测试多线程同步 生产者—消费者 通用模式
         testSynchronizedyDeadLock();//测试多线程死锁
+        testSynchronizedyByTwoThread1();//测试双线程同步：互斥
+        testSynchronizedyByTwoThread2();//测试双线程同步：并行
     }
 
     /////////////////////////////////////测试synchronized/wait/notifyAll：多线程 生产者—消费者 通用模式///////////////////////////////////////////////////////////////////////
@@ -1105,7 +1137,119 @@ Producer线程放入数据后，flag 值为 true。只有 flag 为true 时，Con
 2019-05-14 14:19:17.322 5219-5313/com.example.android.camera2basic I/System.out: Thread[Thread-32,5,main]I am wake up and try to get lock
 2019-05-14 14:19:17.323 5219-5312/com.example.android.camera2basic I/System.out: Thread[Thread-31,5,main]I am wake up and try to get lock
  */
-    /////////////////////////////////////startService开启后台服务///////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////测试synchronized/wait/notifyAll：双线程同步：互斥阻塞///////////////////////////////////////////////////////////////////////
+/*
+当两个并发线程(thread1和thread2)访问同一个对象s(syncThread)中的synchronized代码块时，在同一时刻只能有一个线程得到执行，
+另一个线程受阻塞，必须等待当前线程执行完这个代码块以后才能执行该代码块。Thread1和thread2是互斥的，
+因为在执行synchronized代码块时会锁定当前的对象，只有执行完该代码块才能释放该对象锁，下一个线程才能执行并锁定该对象
+ */
+    public void testSynchronizedyByTwoThread1(){//测试双线程同步：互斥
+        SyncThread s = new SyncThread();
+        Thread t1 = new Thread(s);//使用同一个对象s，synchronized(this)时将阻塞。
+        Thread t2 = new Thread(s);
+        t1.start();
+        t2.start();
+    }
+    /////////////////////////////////////测试synchronized/wait/notifyAll：双线程同步：并行///////////////////////////////////////////////////////////////////////
+/*
+当两个并发线程(thread1和thread2)分别访问两个对象s1和s2(syncThread)中的synchronized代码块时，在同一时刻能有两个线程得到执行，线程并没有受阻塞，
+ */
+    public void testSynchronizedyByTwoThread2(){//测试双线程同步：并行
+        SyncThread s1 = new SyncThread();
+        SyncThread s2 = new SyncThread();
+        Thread t1 = new Thread(s1);//使用不同的两个对象s，synchronized(this)时并不会阻塞。
+        Thread t2 = new Thread(s2);
+        t1.start();
+        t2.start();
+    }
+    private static int countSyncThread;
+    class SyncThread implements Runnable {
+        public SyncThread() {
+            countSyncThread = 0;
+        }
+        public  void run() {
+            synchronized(this) {
+                for (int i = 0; i < 5; i++) {
+                    try {
+                        System.out.println(Thread.currentThread().getName() + ":" + (countSyncThread++));
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+    }
+    /////////////////////////////////////打印当前进程的所有线程信息///////////////////////////////////////////////////////////////////////
+    private void printThreadInProcess() {//打印当前进程的所有线程信息
+        Map<Thread, StackTraceElement[]> stacks = Thread.getAllStackTraces();
+        Set<Thread> set = stacks.keySet();
+        for (Thread key : set) {
+            StackTraceElement[] stackTraceElements = stacks.get(key);
+            Log.d(TAG, "---- print thread: " + key.getName() + " start ----");
+            for (StackTraceElement st : stackTraceElements) {
+                Log.d(TAG, "StackTraceElement: " + st.toString());
+            }
+            Log.d(TAG, "---- print thread: " + key.getName() + " end ----");
+        }
+    }
+
+    /////////////////////////////////////子线程调用主线程所有方式///////////////////////////////////////////////////////////////////////
+    public void testSubThreadCallMainThreadAll(){
+        Context context = null;
+        //testSubThreadCallMainThread1(context);//context null
+        //testSubThreadCallMainThread2();//textView null
+        //testSubThreadCallMainThread3();//环境不在子线程
+    }
+    /////////////////////////////////////子线程调用主线程方式1:activity.runOnUiThread(Runnable action)//////////////////////////////////////////////////////////////////////
+    /*
+    这是我认为第二简单的方法了，一般我的上下文（context）是大部分类都会传到的，而这个 context 其实就是我的 MainActivity，
+    我会直接强制转换成 Activity 然后用activity.runOnUiThread(Runnable action)方法进行更新UI。
+    如果没有上下文（context）怎么办？用view.getContext()可以得到上下文（不过你为什么不直接用方法一呢？）
+    跳过context直接用new Activity().runOnUiThread(Runnable action)来切换到主线程。
+     */
+    /*假设该更新方法在子线程中运行 * @param context 上下文 */
+    public void testSubThreadCallMainThread1(final Context context){//2,activity.runOnUiThread(Runnable action)
+        ((CameraActivity)context).runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                //已在主线程中，可以更新UI
+            }
+        });
+    }
+    /////////////////////////////////////子线程调用主线程方式2:view.post(Runnable action)///////////////////////////////////////////////////////////////////////
+    /*
+    这是view自带的方法，比较简单，如果你的子线程里可以得到要更新的view的话，可以用此方法进行更新。
+    view还有一个方法view.postDelayed(Runnable action, long delayMillis)用来延迟发送。
+     */
+    public void testSubThreadCallMainThread2(){//2.view.post(Runnable action)
+        final TextView textView = null;
+        textView.post(new Runnable() {
+            @Override public void run() {
+                textView.setText("更新啦！");
+                //还可以更新其他的控件
+            }
+        });
+
+    }
+    /////////////////////////////////////子线程调用主线程方式3:Handler mainHandler = new Handler()///////////////////////////////////////////////////////////////////////
+    /*
+Handler 是最常用也是比上面稍微复杂一点的方法。
+首先在主线程中定义Handler，Handler mainHandler = new Handler();（必须要在主线程中定义才能操作主线程，如果想在其他地方定义声明时要这样写
+Handler mainHandler = new Handler(Looper.getMainLooper())，来获取主线程的 Looper 和 Queue ）
+获取到 Handler 后就很简单了，用handler.post(Runnable r)方法把消息处理放在该 handler 依附的消息队列中（也就是主线程消息队列），
+这也是为什么我们第一步一定要获取主线程的 handler，如果在子线程中直接声明 handler，调用handler.post(Runnable r)其实还是在子线程中调用
+     */
+    public void testSubThreadCallMainThread3(){//3.Handler mainHandler = new Handler()
+            //假设已在子线程
+        Handler mainHandler = new Handler(Looper.getMainLooper());
+        mainHandler.post(new Runnable() {
+            @Override public void run() {
+                //已在主线程中，可以更新UI
+            }
+        });
+    }
+ /////////////////////////////////////startService开启后台服务///////////////////////////////////////////////////////////////////////
     public void teststartService(){
         // 设置当前布局视图
         setContentView(R.layout.myservice);
