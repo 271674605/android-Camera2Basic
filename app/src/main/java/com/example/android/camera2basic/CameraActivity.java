@@ -76,6 +76,8 @@ public class CameraActivity extends AppCompatActivity {
             CreatHandlerByAllMethod();
             CreatHandlerInThreadByAllMethod();
             testMainAndSubThreadSendMessage();
+            CreatSynchronizedByAllMethod();
+            testSynchronizedWaitNotifyAll();
         }else if(switchFunc == 1){
             teststartService();
         }
@@ -323,7 +325,7 @@ public class CameraActivity extends AppCompatActivity {
         myCreatThread myThread = new myCreatThread();
         myThread.start();
         //等价于
-        new myCreatThread().start();
+        new myCreatThread().start();//调用 Thread 类中的 start()方法，实际上是调用 run()方法
     }
     class myCreatThread extends Thread{
         @Override
@@ -331,6 +333,16 @@ public class CameraActivity extends AppCompatActivity {
             super.run();
             //干你需要做的操作
             Thread.currentThread().setName("bruce线程:myCreatThread");
+            try{
+                System.out.println("在 run()方法中 -  这个线程休眠 2 秒");
+                Thread.sleep(2000);
+                System.out.println("在 run()方法中 -  继续运行");
+            }catch (InterruptedException x) {
+                System.out.println("在 run()方法中 -  中断线程");
+                return;
+            }
+            System.out.println("在 run()方法中 -  休眠之后继续完成");
+            System.out.println("在 run()方法中 -  正常退出");
         }
     }
     /////////////////////////////////////创建线程方式2：CreatThreadByMethod2///////////////////////////////////////////////////////////////////////
@@ -345,6 +357,22 @@ public class CameraActivity extends AppCompatActivity {
         }.start();
     }
     /////////////////////////////////////创建线程方式3：CreatThreadByMethod3///////////////////////////////////////////////////////////////////////
+/*
+可见，实现 Runnable 接口相对于继承 Thread 类来说，有如下显著的优势：
+（1）、  适合多个相同程序代码的线程去处理同一资源的情况，把虚拟 CPU（线
+程）同程序的代码、数据有效分离，较好地体现了面向对象的设计思想。
+（2）、  可以避免由于 Java 的单继承特性带来的局限。开发中经常碰到这样一种
+情况，即：当要将已经继承了某一个类的子类放入多线程中，由于一个
+类不能同时有两个父类，所以不能用继承 Thread 类的方式，那么就只能
+采用实现 Runnable 接口的方式了。
+（3）、  增强了程序的健壮性，代码能够被多个线程共享，代码与数据是独立的。
+当多个线程的执行代码来自同一个类的实例时，即称它们共享相同的代
+码。多个线程可以操作相同的数据，与它们的代码无关。当共享访问相
+同的对象时，即共享相同的数据。当线程被构造时，需要的代码和数据
+通过一个对象作为构造函数实参传递进去，这个对象就是一个实现了
+Runnable 接口的类的实例。
+     事实上，几乎所有多线程应用都可用第二种方式，即实现 Runnable 接口。
+ */
     public void CreatThreadByMethod3(){//3、通过实现runnable接口来实现,同样，可以单独写一个类实现runnable接口
         myCreatRunnable firstRunnable = new myCreatRunnable();
         new Thread(firstRunnable).start();
@@ -862,11 +890,221 @@ demo中设置的任务队列长度为100，所以不会开启额外的5-3=2个�
 结果：前三个任务被创建的三个核心线程执行，之后的27个任务进入队列并且调用compareTo方法进行排序，之后打印出来的是经过排序后从大到小的顺序。
  */
 
+    /////////////////////////////////////创建synchronized所有方式：CreatSynchronizedByAllMethod()//////////////////////////////////////////////////////////////////////
+/*
+synchronized可以用在方法上也可以使用在代码块中，其中方法是实例方法和静态方法分别锁的是该类的实例对象和该类的对象。而使用在代码块中也可以分为三种，具体的可以看上面的表格。
+这里的需要注意的是：如果锁的是类对象的话，尽管new多个实例对象，但他们仍然是属于同一个类依然会被锁住，即线程之间保证同步关系。
+synchronized修饰方法和修饰一个代码块类似，只是作用范围不一样，修饰代码块是大括号括起来的范围，而修饰方法范围是整个函数。
+ */
+    public void CreatSynchronizedByAllMethod(){
+        CreatSynchronizedByMethod1();
+        CreatSynchronizedByMethod2();
+        CreatSynchronizedByMethod3();
+        CreatSynchronizedByMethod4();
+        CreatSynchronizedByMethod5();
+    }
+    /////////////////////////////////////创建synchronized方式1：///////////////////////////////////////////////////////////////////////
+    //锁定了整个方法时的内容。在调用该方法前，需要获得内置锁，否则就处于阻塞状态。等价于CreatSynchronizedByMethod2()。
+    //注：同步是一种高开销的操作，因此应该尽量减少同步的内容。通常没有必要同步整个方法，使用synchronized代码块同步关键代码即可。
+    public synchronized void CreatSynchronizedByMethod1() {//实例方法，锁住的是该类的实例对象,
 
+    }
+    /////////////////////////////////////创建synchronized方式2：///////////////////////////////////////////////////////////////////////
+    public void CreatSynchronizedByMethod2() {//同步代码块，锁住的是该类的实例对象,
+        synchronized (this){    // 这里用的this，则锁定了整个方法时的内容。等价于CreatSynchronizedByMethod1()。
 
+        }
+    }
+    /////////////////////////////////////创建synchronized方式3：///////////////////////////////////////////////////////////////////////
+    public static synchronized void CreatSynchronizedByMethod3() {//静态方法，锁住的是类对象，即将会锁住整个类
 
+    }
+    /////////////////////////////////////创建synchronized方式4：///////////////////////////////////////////////////////////////////////
+    private static int count = 0;
+    public void CreatSynchronizedByMethod4() {//同步代码块，锁住的是该类的类对象
+        for (int i = 0; i < 10; i++) {
+            Thread thread = new Thread(new CreatSynchronizedByMethod4Runnable());//开启十个线程
+            thread.start();
+        }
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        System.out.println("result: " + count);
+    }
+    class CreatSynchronizedByMethod4Runnable implements Runnable{
+        @Override
+        public void run() {
+            synchronized (CameraActivity.class) {//同步代码块，锁住的是该类的类对象，即将会锁住整个类
+                for (int i = 0; i < 1000; i++)
+                    count++;
+            }
+        }
+    }
+    /*
+  开启十个线程，每个线程在原值上累加1000次，最终正确的结果为10X1000=10000，这里能够计算出正确的结果是因为在做累加操作时使用了同步代码块，
+  这样就能保证每个线程所获得共享变量的值都是当前最新的值，如果不使用同步的话，就可能会出现A线程累加后，而B线程做累加操作有可能是使用原来的就值，即“脏值”。
+  这样，就导致最终的计算结果不是正确的。而使用Syncnized就可能保证内存可见性，保证每个线程都是操作的最新值。
+  当两个并发线程(thread1和thread2)访问同一个对象(syncThread)中的synchronized代码块时，在同一时刻只能有一个线程得到执行，另一个线程受阻塞，
+  必须等待当前线程执行完这个代码块以后才能执行该代码块。Thread1和thread2是互斥的，因为在执行synchronized代码块时会锁定当前的对象，
+  只有执行完该代码块才能释放该对象锁，下一个线程才能执行并锁定该对象。
 
+     */
+    /////////////////////////////////////创建synchronized方式5：///////////////////////////////////////////////////////////////////////
+    final Object mObject = new Object();
+    public void CreatSynchronizedByMethod5() {//同步代码块，锁住的是配置的实例对象mObject
+        synchronized (mObject){ // 锁定了synchronized{}整个大括号里的内容。
 
+        }
+    }
+    /////////////////////////////////////测试synchronized/wait/notifyAll：多线程///////////////////////////////////////////////////////////////////////
+    public void testSynchronizedWaitNotifyAll(){
+        testSynchronizedWaitNotify();//测试多线程同步 生产者—消费者 通用模式
+        testSynchronizedyDeadLock();//测试多线程死锁
+    }
+
+    /////////////////////////////////////测试synchronized/wait/notifyAll：多线程 生产者—消费者 通用模式///////////////////////////////////////////////////////////////////////
+/*
+ //生产者——消费者 通用模式
+// 1、while（）
+// 2、notifyAll（）
+    wait、notify、notifyAll 这三个方法只能在 synchronized 方法中调用，即无论线程调用一个对象的wait还是notify方法，该线程必须先得到该对象的锁标记，这样， notify
+只能唤醒同一对象监视器中调用 wait 的线程，使用多个对象监视器，就可以分别有多个 wait、notify的情况，同组里的 wait 只能被同组的 notify唤醒。
+//理解思路：
+// 1、标记flag，理解为: 仓库里有产品，则Producer不再生产改变标记标记flag。在不再生产前，唤醒消费线程Consumer。
+// 2、生产的线程Producer则因为循环，执行等待。
+// 3、等待的线程被唤醒后，第一件事是重新判断标记flag，是否仓库有货，即while循环的条件判断，如没货才可以生产，有货则消费。
+ */
+    public void testSynchronizedWaitNotify(){//ProducerConsumerDemo:多线程 生产者—消费者 通用模式
+        Resource r = new Resource();
+        Producer mProducer = new Producer(r);
+        Consumer mConsumer = new Consumer(r);
+        //多个生产者消费者时：
+        new Thread(mProducer).start();//启动第一个Producer线程pA
+        new Thread(mProducer).start();//启动第二个Producer线程pB
+        new Thread(mConsumer).start();//启动第一个Consumer线程cA
+        new Thread(mConsumer).start();//启动第二个Consumer线程cB
+    }
+    class Resource { //生产者&&消费者公共资源仓库
+        private String name;
+        private int count = 0;
+        private boolean flag = false;
+        public synchronized void produce(String name) {//锁住produce方法
+            while (flag) {//flag = true，表示仓库有产品。一直循环到consume()消费者线程将flag = false。
+                try {
+                    wait();//pA阻塞，后来的线程要等待，即第二个Producer线程pB将无法执行同步方法produce
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            this.name = name + (++count);
+            System.out.println("生产：" + this.name);
+            flag = !flag;
+            notifyAll();//唤醒最先到达的线程，即上面while循环一直到consume()消费者线程将flag = false，此时notifyAll所有Producer线程pA和pB,进一步生产。
+        }
+        public synchronized void consume() {//锁住consume方法
+            while (!flag) {//flag = false，表示仓库没有产品。一直循环到produce()消费者线程将flag = true。
+                try {
+                    wait();//cA阻塞，后来的线程要等待，即第二个Consumer线程cB将无法执行同步方法consume
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            System.out.println("...........消费：" + name);
+            flag = !flag;
+            notifyAll();//唤醒最先到达的线程，即上面while循环一直到produce()生产者线程将flag = false，此时notifyAll所有Consumer线程cA和cB,进一步消费。
+        }
+    }
+    class Producer implements Runnable {
+        private Resource r;
+        public Producer(Resource r) {
+            this.r = r;
+        }
+        public void run() {
+            while (true) {//循环生产
+                r.produce("商品");
+            }
+        }
+    }
+    class Consumer implements Runnable {
+        private Resource r;
+        public Consumer(Resource r) {
+            this.r = r;
+        }
+        public void run() {
+            while (true) {//循环消费
+                r.consume();
+            }
+        }
+    }
+/*
+输出：
+生产：商品
+...........消费：商品
+生产：商品
+...........消费：商品
+生产：商品
+...........消费：商品
+实际要求的结果是，Producer放一次数据，Consumer就取一次；反之，Producer也必须等到 Consumer 取完后才能放入新的数据，而这一问题的解决就
+需要使用下面所要讲到的线程间的通信。 Java 是通过 Object 类的 wait、 notify、 notifyAll这几个方法来实现线程间的通信的，
+又因为所有的类都是从 Object 继承的，所以任何类都可以直接使用这些方法。下面是这三个方法的简要说明：
+    wait：告诉当前线程放弃监视器并进入睡眠状态，直到其它线程进入同一监视器并调用 notify为止。
+    notify：唤醒同一对象监视器中调用 wait 的第一个线程。类似排队买票，一个人买完之后，后面的人可以继续买。
+notifyAll：唤醒同一对象监视器中调用 wait 的所有线程，具有最高优先级的线程首先被唤醒并执行。
+
+如果想符合预先的设计需求，必须在类 P 中定义一个新的成员变量flag来表示数据存储空间的状态，当 Consumer 线程取走数据后，flag值为 false，当
+Producer线程放入数据后，flag 值为 true。只有 flag 为true 时，Consumer 线程才能取走数据，否则就必须等待 Producer 线程放入新的数据后的通知；反之，只有 flag
+为 false，Producer 线程才能放入新的数据，否则就必须等待 Consumer 线程取走数据后的通知。
+ */
+    /////////////////////////////////////测试synchronized/wait/notifyAll：多线程 死锁///////////////////////////////////////////////////////////////////////
+    public void testSynchronizedyDeadLock(){//DeadLockDemo:多线程 死锁
+        new TaskA().start();
+        new TaskB().start();
+    }
+    private static final Object LOCK_A = new Object();
+    private static final Object LOCK_B = new Object();
+
+    private static class TaskA extends Thread {
+        @Override
+        public void run() {
+            try {
+                synchronized (LOCK_A) {//TaskA持有LOCK_A
+                    System.out.println(Thread.currentThread() + "I hold the LOCK_A");
+                    Thread.sleep(5000);
+                    System.out.println(Thread.currentThread() + "I am wake up and try to get lock");
+                    synchronized (LOCK_B) {//TaskB已经持有LOCK_B，因此这个同步代码块无法执行
+                        System.out.println(Thread.currentThread() + "I get the LOCK_B");
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
+            }
+        }
+    }
+    private static class TaskB extends Thread {
+        @Override
+        public void run() {
+            try {
+                synchronized (LOCK_B) {//TaskB持有LOCK_B
+                    System.out.println(Thread.currentThread() + "I hold the LOCK_B");
+                    Thread.sleep(5000);
+                    System.out.println(Thread.currentThread() + "I am wake up and try to get lock");
+                    synchronized (LOCK_A) {//TaskA已经持有LOCK_A，因此这个同步代码块无法执行
+                        System.out.println(Thread.currentThread() + "I get the LOCK_A");
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
+            }
+        }
+    }
+/*输出：两个线程都因为获取不到指定锁而阻塞
+2019-05-14 14:19:12.322 5219-5313/com.example.android.camera2basic I/System.out: Thread[Thread-32,5,main]I hold the LOCK_B
+2019-05-14 14:19:12.322 5219-5312/com.example.android.camera2basic I/System.out: Thread[Thread-31,5,main]I hold the LOCK_A
+2019-05-14 14:19:17.322 5219-5313/com.example.android.camera2basic I/System.out: Thread[Thread-32,5,main]I am wake up and try to get lock
+2019-05-14 14:19:17.323 5219-5312/com.example.android.camera2basic I/System.out: Thread[Thread-31,5,main]I am wake up and try to get lock
+ */
     /////////////////////////////////////startService开启后台服务///////////////////////////////////////////////////////////////////////
     public void teststartService(){
         // 设置当前布局视图
@@ -927,7 +1165,6 @@ demo中设置的任务队列长度为100，所以不会开启额外的5-3=2个�
             Toast.makeText(CameraActivity.this, "Disconnect！", Toast.LENGTH_LONG).show();
         }
     };
-
     // 綁定Service监听器
     private View.OnClickListener bindListener = new View.OnClickListener() {
         @Override
@@ -942,8 +1179,6 @@ demo中设置的任务队列长度为100，所以不会开启额外的5-3=2个�
             bindService(intent, conn, Service.BIND_AUTO_CREATE);
         }
     };
-
-
     // 解除绑定Service监听器
     private View.OnClickListener unBindListener = new View.OnClickListener() {
         @Override
