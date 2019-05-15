@@ -16,6 +16,7 @@
 
 package com.example.android.camera2basic;
 
+import android.app.Activity;
 import android.app.IntentService;
 import android.app.Service;
 import android.content.ComponentName;
@@ -37,6 +38,7 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.lang.ref.WeakReference;
 import java.util.Map;
 import java.util.Set;
 import java.util.Timer;
@@ -78,17 +80,18 @@ public class CameraActivity extends AppCompatActivity {
                         .replace(R.id.container, Camera2BasicFragment.newInstance())
                         .commit();
             }
-            CreatThreadByAllMethod();
-            CreatThreadPoolByAllMethod();
-            CreatHandlerByAllMethod();
-            CreatHandlerInThreadByAllMethod();
-            testMainAndSubThreadSendMessage();
-            CreatSynchronizedByAllMethod();
-            testSynchronizedWaitNotifyAll();
-            testSubThreadCallMainThreadAll();
+            CreatThreadByAllMethod();//创建线程所有方式
+            CreatThreadPoolByAllMethod();//创建线程池所有方式
+            CreatHandlerByAllMethod();//创建Handler所有方式
+            CreatHandlerInThreadByAllMethod();//线程中创建handler所有方式
+            testMainAndSubThreadSendMessage();//主线程和子线程相互通信
+            CreatSynchronizedByAllMethod();//创建synchronized所有方式
+            testSynchronizedWaitNotifyAll();//测试synchronized/wait/notifyAll：多线程
+            testSubThreadCallMainThreadAll();//子线程调用主线程所有方式
+            testHandlerMemoryLeakAll();//测试Handler内存泄露
             printThreadInProcess();//打印当前进程的所有线程信息
-        }else if(switchFunc == 1){
-            teststartService();
+        }else if(switchFunc == 1){//hello world demo
+            teststartService();//测试后台服务
         }
     }
 
@@ -408,12 +411,27 @@ Runnable 接口的类的实例。
         }).start();
     }
     ////////////////////////////////创建线程方式6：CreatThreadByMethod6: HandlerThread方式开启线程////////////////////////////////////////////////////////////////////////////
+/*
+1. 定义
+一个Android 已封装好的轻量级异步类
+2. 作用
+实现多线程:在工作线程中执行任务，如 耗时任务
+异步通信、消息传递: 实现工作线程 & 主线程（UI线程）之间的通信，即：将工作线程的执行结果传递给主线程，从而在主线程中执行相关的UI操作
+3. 优点
+方便实现异步通信，即不需使用 “任务线程（如继承Thread类） + Handler”的复杂组合.
+实际上，HandlerThread本质上是通过继承Thread类和封装Handler类的使用，从而使得创建新线程和与其他线程进行通信变得更加方便易用
+4. 工作原理
+内部原理 = Thread类 + Handler类机制，即：
+通过继承Thread类，快速地创建1个带有Looper对象的新工作线程
+通过封装Handler类，快速创建Handler & 与其他线程进行通信
+ */
     public void CreatThreadByMethod6(){//6、HandlerThread方式开启线程
         mMainHandlerCallback = new Handler(getMainLooper());
-        bruceHandlerThread = new HandlerThread("ruce线程6:bruceHandlerThread");
-        bruceHandlerThread.start();
-        mBruceHandlerThreadSub =  new bruceHandlerThreadSub(bruceHandlerThread.getLooper());//获取bruceHandlerThread的Loop，通过它创建bruceHandlerThread的Handler
-        mBruceHandlerThreadSub.sendEmptyMessage(EXPRESSION);
+        bruceHandlerThread = new HandlerThread("ruce线程6:bruceHandlerThread");// 步骤1：创建HandlerThread实例对象
+        bruceHandlerThread.start();// 步骤2：启动线程
+        // 步骤3：创建工作线程Handler & 复写handleMessage（）
+        mBruceHandlerThreadSub =  new bruceHandlerThreadSub(bruceHandlerThread.getLooper());//获取bruceHandlerThread的Loop，通过它创建bruceHandlerThread的Handler.
+        mBruceHandlerThreadSub.sendEmptyMessage(EXPRESSION);// 步骤4：使用工作线程Handler向工作线程的消息队列发送消息
     }
     public class bruceHandlerThreadSub extends Handler {
 
@@ -429,6 +447,14 @@ Runnable 接口的类的实例。
                     //处理表情
                     Log.i(TAG,"HandlerThread 收到表情消息");
                     mMainHandlerCallback.sendEmptyMessage(RECV_EXPRESSION);
+                    // 通过主线程Handler.post方法进行在主线程的UI更新操作
+                    mMainHandlerCallback.post(new Runnable() {
+                        @Override
+                        public void run () {
+                            //text.setText("我爱学习");
+                        }
+                    });
+
                     break;
                 case RECV_EXPRESSION:
                     //主线程界面出现提示框
@@ -442,7 +468,7 @@ Runnable 接口的类的实例。
     }
     public void DestroyThreadByMethod6(){
         if (bruceHandlerThread != null)
-            bruceHandlerThread.quitSafely();
+            bruceHandlerThread.quitSafely();// 步骤5：结束线程，即停止线程的消息循环
         try {
             if (bruceHandlerThread != null) {
                 bruceHandlerThread.join();
@@ -601,6 +627,247 @@ Runnable 接口的类的实例。
             }
         }.execute();//可以理解为执行 这个AsyncTask
     }
+
+    /////////////////////////////////////测试解决handler内存泄漏方式：testHandlerMemoryLeakAll()//////////////////////////////////////////////////////////////////////
+    public void testHandlerMemoryLeakAll(){
+        testHandlerMemoryLeak1();//测试handler内存泄漏方式1：//新建Handler子类（内部类）造成的内存泄漏
+        testHandlerMemoryLeak2();//测试handler内存泄漏方式2：//匿名Handler内部类造成的内存泄漏
+        testSolveHandlerMemoryLeak1();//解决handler内存泄漏方式1：静态内部类+ 弱引用
+        testSolveHandlerMemoryLeak2();//解决handler内存泄漏方式2：当外部类结束生命周期时，清空Handler内消息队列
+    }
+    /*
+    1. 问题描述: Handler的一般用法 = 新建Handler子类（内部类） 、匿名Handler内部类
+        a：testHandlerMemoryLeak1()和testHandlerMemoryLeak2（)虽都可运行成功，但代码会出现严重警告：
+        b：警告的原因 = 该Handler类由于无设置为 静态类，从而导致了内存泄露
+        c：最终的内存泄露发生在Handler类的外部类：MainActivity类
+
+    2. 原因讲解
+    2.1 储备知识
+        a：主线程的Looper对象的生命周期 = 该应用程序的生命周期
+        b：在Java中，非静态内部类 & 匿名内部类都默认持有 外部类的引用
+    2.2 泄露原因描述
+        从上述示例代码可知：
+    a：上述的Handler实例的消息队列有2个分别来自线程1、2的消息（分别为延迟1s、6s）
+    b：在Handler消息队列 还有未处理的消息 / 正在处理消息时，消息队列中的Message持有Handler实例的引用
+    c：由于Handler = 非静态内部类 / 匿名内部类（2种使用方式），故又默认持有外部类的引用（即CameraActivity实例），引用关系如下：
+        Handler内的消息（Message）  --->（引用）   Handler实例（非静态内部类对象）   --->（默认引用）    Activity实例（外部类）
+        上述的引用关系会一直保持，直到Handler消息队列中的所有消息被处理完毕
+    d：在Handler消息队列 还有未处理的消息 / 正在处理消息时，此时若需销毁外部类CameraActivity，但由于上述引用关系，垃圾回收器（GC）无法回收CameraActivity，从而造成内存泄漏。如下：
+       Handler内的消息（Message） --->（引用） Handler实例（非静态内部类对象）--->（默认引用） Activity实例（外部类） ） --->（引用关系保持） 需销毁外部类CameraActivity  --->  CameraActivity实例无法被回收    --->  造成内存泄漏
+
+    2.3 总结
+    当Handler消息队列 还有未处理的消息 / 正在处理消息时，存在引用关系： “未被处理 / 正处理的消息 -> Handler实例 -> 外部类”
+    若出现 Handler的生命周期 > 外部类的生命周期 时（即 Handler消息队列 还有未处理的消息 / 正在处理消息 而 外部类需销毁时），将使得外部类无法被垃圾回收器（GC）回收，从而造成 内存泄露
+
+    3. 解决方案
+    从上面可看出，造成内存泄露的原因有2个关键条件：
+        a：存在“未被处理 / 正处理的消息 -> Handler实例 -> 外部类” 的引用关系
+        b：Handler的生命周期 > 外部类的生命周期
+        即 Handler消息队列 还有未处理的消息 / 正在处理消息 而 外部类需销毁，解决方案的思路 = 使得上述任1条件不成立 即可。
+
+    解决方案1：静态内部类+ 弱引用
+    原理：静态内部类 不默认持有外部类的引用，从而使得 “未被处理 / 正处理的消息 -> Handler实例 -> 外部类” 的引用关系 的引用关系 不复存在。
+    具体方案：将Handler的子类设置成 静态内部类。
+        同时，还可加上 使用WeakReference弱引用持有Activity实例
+        原因：弱引用的对象拥有短暂的生命周期。在垃圾回收器线程扫描时，一旦发现了只具有弱引用的对象，不管当前内存空间足够与否，都会回收它的内存
+    解决代码：testSolveHandlerMemoryLeak1()
+
+    解决方案2：当外部类结束生命周期时，清空Handler内消息队列
+    原理：不仅使得 “未被处理 / 正处理的消息 -> Handler实例 -> 外部类” 的引用关系 不复存在，同时 使得 Handler的生命周期（即 消息存在的时期） 与 外部类的生命周期 同步
+    具体方案：当 外部类（此处以Activity为例） 结束生命周期时（此时系统会调用onDestroy（）），清除 Handler消息队列里的所有消息（调用removeCallbacksAndMessages(null)）
+    具体代码：testSolveHandlerMemoryLeak2()
+
+    使用建议：为了保证Handler中消息队列中的所有消息都能被执行，此处推荐使用解决方案1解决内存泄露问题，即 静态内部类 + 弱引用的方式
+     */
+    /////////////////////////////////////测试handler内存泄漏：testHandlerMemoryLeak1()//////////////////////////////////////////////////////////////////////
+    private Handler showhandler;
+    public void testHandlerMemoryLeak1(){//新建Handler子类（内部类）造成的内存泄漏
+        //1. 实例化自定义的Handler类对象->>分析1
+        //注：此处并无指定Looper，故自动绑定当前线程(主线程)的Looper、MessageQueue.// 主线程创建时便自动创建Looper & 对应的MessageQueue之后执行Loop()进入消息循环
+        showhandler = new FHandler();
+
+        // 2. 启动子线程1
+        new Thread() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                // a. 定义要发送的消息
+                Message msg = Message.obtain();
+                msg.what = 1;// 消息标识
+                msg.obj = "AA";// 消息存放
+                // b. 传入主线程的Handler & 向其MessageQueue发送消息
+                showhandler.sendMessage(msg);
+            }
+        }.start();
+
+        new Thread() {// 3. 启动子线程2
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                // a. 定义要发送的消息
+                Message msg = Message.obtain();
+                msg.what = 2;// 消息标识
+                msg.obj = "BB";// 消息存放
+                // b. 传入主线程的Handler & 向其MessageQueue发送消息
+                showhandler.sendMessage(msg);
+            }
+        }.start();
+    }
+    class FHandler extends Handler {// 分析1：自定义Handler子类（非静态内部类），默认持有外部类的引用（即CameraActivity实例）
+        // 通过复写handlerMessage() 从而确定更新UI的操作
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case 1:
+                    Log.d(TAG, "收到线程1的消息");
+                    break;
+                case 2:
+                    Log.d(TAG, " 收到线程2的消息");
+                    break;
+
+
+            }
+        }
+    }
+    /////////////////////////////////////测试handler内存泄漏：testHandlerMemoryLeak2()//////////////////////////////////////////////////////////////////////
+    public void testHandlerMemoryLeak2(){//匿名Handler内部类造成的内存泄漏
+        //注：此处并无指定Looper，故自动绑定当前线程(主线程)的Looper、MessageQueue
+        showhandler = new  Handler(){//1. 通过匿名内部类实例化的Handler类对象，默认持有外部类的引用（即CameraActivity实例）
+            // 通过复写handlerMessage()从而确定更新UI的操作
+            @Override
+            public void handleMessage(Message msg) {
+                switch (msg.what) {
+                    case 1:
+                        Log.d(TAG, "收到线程1的消息");
+                        break;
+                    case 2:
+                        Log.d(TAG, " 收到线程2的消息");
+                        break;
+                }
+            }
+        };
+
+        // 2. 启动子线程1
+        new Thread() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                // a. 定义要发送的消息
+                Message msg = Message.obtain();
+                msg.what = 1;// 消息标识
+                msg.obj = "AA";// 消息存放
+                // b. 传入主线程的Handler & 向其MessageQueue发送消息
+                showhandler.sendMessage(msg);
+            }
+        }.start();
+
+        // 3. 启动子线程2
+        new Thread() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                // a. 定义要发送的消息
+                Message msg = Message.obtain();
+                msg.what = 2;// 消息标识
+                msg.obj = "BB";// 消息存放
+                // b. 传入主线程的Handler & 向其MessageQueue发送消息
+                showhandler.sendMessage(msg);
+            }
+        }.start();
+    }
+    /////////////////////////////////////解决handler内存泄漏方式1：testSolveHandlerMemoryLeak1()//////////////////////////////////////////////////////////////////////
+    public static final String TAG1 = "carson：";
+    private Handler showhandlerByStaticClass;
+    public void testSolveHandlerMemoryLeak1(){
+        //1. 实例化自定义的Handler类对象->>分析1
+        //注：
+        // a. 此处并无指定Looper，故自动绑定当前线程(主线程)的Looper、MessageQueue；
+        // b. 定义时需传入持有的Activity实例（弱引用）
+        showhandlerByStaticClass = new FHandlerByStaticClass(this);
+
+        // 2. 启动子线程1
+        new Thread() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                // a. 定义要发送的消息
+                Message msg = Message.obtain();
+                msg.what = 1;// 消息标识
+                msg.obj = "AA";// 消息存放
+                // b. 传入主线程的Handler & 向其MessageQueue发送消息
+                showhandlerByStaticClass.sendMessage(msg);
+            }
+        }.start();
+
+        // 3. 启动子线程2
+        new Thread() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                // a. 定义要发送的消息
+                Message msg = Message.obtain();
+                msg.what = 2;// 消息标识
+                msg.obj = "BB";// 消息存放
+                // b. 传入主线程的Handler & 向其MessageQueue发送消息
+                showhandlerByStaticClass.sendMessage(msg);
+            }
+        }.start();
+    }
+    // 分析1：自定义Handler子类
+    // 设置为：静态内部类
+    private static class FHandlerByStaticClass extends Handler{
+        // 定义 弱引用实例
+        private WeakReference<Activity> reference;
+
+        // 在构造方法中传入需持有的Activity实例
+        public FHandlerByStaticClass(Activity activity) {
+            // 使用WeakReference弱引用持有Activity实例
+            reference = new WeakReference<Activity>(activity); }
+
+        // 通过复写handlerMessage() 从而确定更新UI的操作
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case 1:
+                    Log.d(TAG1, "收到线程1的消息");
+                    break;
+                case 2:
+                    Log.d(TAG1, " 收到线程2的消息");
+                    break;
+
+
+            }
+        }
+    }
+    /////////////////////////////////////解决handler内存泄漏方式2：testSolveHandlerMemoryLeak2()//////////////////////////////////////////////////////////////////////
+    public void testSolveHandlerMemoryLeak2(){
+        showhandler.removeCallbacksAndMessages(null);// 外部类Activity生命周期结束时，同时清空消息队列 & 结束Handler生命周期
+    }
+
 
     /////////////////////////////////////线程中创建handler所有方式：CreatHandlerByAllMethod()//////////////////////////////////////////////////////////////////////
     public void CreatHandlerByAllMethod(){
@@ -918,6 +1185,22 @@ demo中设置的任务队列长度为100，所以不会开启额外的5-3=2个�
 
     /////////////////////////////////////创建synchronized所有方式：CreatSynchronizedByAllMethod()//////////////////////////////////////////////////////////////////////
 /*
+Java中关于多线程中使用的一些关键字和一些方法的作用
+关键字  作用
+volatile线程操作变量可见： 保证了不同线程对这个变量进行操作时的可见性，即一个线程修改了某个变量的值，这新值对其他线程来说是立即可见的。volatile关键字会强制将修改的值立即写入主存，使线程的工作内存中缓存变量行无效。
+Lock  Java6.0增加的线程同步锁
+synchronized线程同步锁
+wait()让该线程处于等待状态
+notify()唤醒一个正在wait该对象的线程，只是通知一个线程（至于是哪个线程就看JVM了）
+notifyAll()唤醒所有正在wait该对象的线程。
+sleep()线程休眠
+join()使当线程处于阻塞状态，让指定的线程先执行完再执行其他线程，而且会阻塞主线程
+yield()让出该线程的时间片给其他线程
+注意：
+1. wait()、notify()、notifyAll()都必须在synchronized中执行，否则会抛出异常
+2. wait()、notify()、notifyAll()都是属于超类Object的方法
+2. 一个对象只有一个锁（对象锁和类锁还是有区别的）
+
 synchronized可以用在方法上也可以使用在代码块中，其中方法是实例方法和静态方法分别锁的是该类的实例对象和该类的对象。而使用在代码块中也可以分为三种，具体的可以看上面的表格。
 这里的需要注意的是：如果锁的是类对象的话，尽管new多个实例对象，但他们仍然是属于同一个类依然会被锁住，即线程之间保证同步关系。
 synchronized修饰方法和修饰一个代码块类似，只是作用范围不一样，修饰代码块是大括号括起来的范围，而修饰方法范围是整个函数。
