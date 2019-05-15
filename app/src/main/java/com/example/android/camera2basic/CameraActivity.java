@@ -73,7 +73,7 @@ public class CameraActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        if(switchFunc == 0) {//camera2basic默认功能
+        if(switchFunc == 2) {//camera2basic默认功能
             setContentView(R.layout.activity_camera);
             if (null == savedInstanceState) {
                 getSupportFragmentManager().beginTransaction()
@@ -90,8 +90,10 @@ public class CameraActivity extends AppCompatActivity {
             testSubThreadCallMainThreadAll();//子线程调用主线程所有方式
             testHandlerMemoryLeakAll();//测试Handler内存泄露
             printThreadInProcess();//打印当前进程的所有线程信息
-        }else if(switchFunc == 1){//hello world demo
+        }else if(switchFunc == 1){//Service demo
             teststartService();//测试后台服务
+        }else if(switchFunc == 0){//在hello world demo中测试单个测试项
+            setContentView(R.layout.activity_main);
         }
     }
 
