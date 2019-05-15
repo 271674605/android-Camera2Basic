@@ -39,6 +39,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Timer;
@@ -88,7 +90,7 @@ public class CameraActivity extends AppCompatActivity {
             CreatSynchronizedByAllMethod();//创建synchronized所有方式
             testSynchronizedWaitNotifyAll();//测试synchronized/wait/notifyAll：多线程
             testSubThreadCallMainThreadAll();//子线程调用主线程所有方式
-            testHandlerMemoryLeakAll();//测试Handler内存泄露
+            testMemoryLeakAll();//测试内存泄露
             printThreadInProcess();//打印当前进程的所有线程信息
         }else if(switchFunc == 1){//Service demo
             teststartService();//测试后台服务
@@ -629,7 +631,45 @@ Runnable 接口的类的实例。
             }
         }.execute();//可以理解为执行 这个AsyncTask
     }
+    /////////////////////////////////////测试解决handler内存泄漏方式：testHandlerMemoryLeakAll()//////////////////////////////////////////////////////////////////////
 
+    public void testMemoryLeakAll() {
+        testHandlerMemoryLeakAll();//测试Handler造成内存泄露
+        testListMemoryLeakAll();//测试List集合类造成内存泄露
+        testStaticMemoryLeakAll();//测试Static关键字修饰的成员变量造成内存泄露
+    }
+    /////////////////////////////////////测试解决List集合类内存泄漏方式：testListMemoryLeakAll()//////////////////////////////////////////////////////////////////////
+    public void testStaticMemoryLeakAll(){
+        testStaticMemoryLeak1();
+    }
+    /////////////////////////////////////测试解决Static关键字修饰的成员变量造成内存泄漏方式1：//////////////////////////////////////////////////////////////////////
+    public void testStaticMemoryLeak1(){//测试Static关键字修饰的成员变量造成内存泄露
+
+    }
+    public void testSolveStaticMemoryLeak1(){//解决Static关键字修饰的成员变量造成内存泄露
+
+    }
+        /////////////////////////////////////测试解决List集合类内存泄漏方式：testListMemoryLeakAll()//////////////////////////////////////////////////////////////////////
+    public void testListMemoryLeakAll(){
+        testListMemoryLeak1();
+    }
+    /////////////////////////////////////测试解决List集合类内存泄漏方式1：//////////////////////////////////////////////////////////////////////
+    // 通过 循环申请Object 对象 & 将申请的对象逐个放入到集合List
+    List<Object> objectList = new ArrayList<>();
+    public void testListMemoryLeak1(){//测试List集合类内存泄漏
+        for (int i = 0; i < 10; i++) {
+            Object o = new Object();
+            objectList.add(o);
+            // 虽释放了集合元素引用的本身：o=null）
+            // 但集合List 仍然引用该对象，故垃圾回收器GC 依然不可回收该对象
+            o = null;
+        }
+    }
+    public void testSolveListMemoryLeak1(){//解决List集合类内存泄漏
+        // 释放objectList
+        objectList.clear();
+        objectList=null;
+    }
     /////////////////////////////////////测试解决handler内存泄漏方式：testHandlerMemoryLeakAll()//////////////////////////////////////////////////////////////////////
     public void testHandlerMemoryLeakAll(){
         testHandlerMemoryLeak1();//测试handler内存泄漏方式1：//新建Handler子类（内部类）造成的内存泄漏
