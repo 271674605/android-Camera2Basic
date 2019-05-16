@@ -638,18 +638,37 @@ Runnable 接口的类的实例。
         testListMemoryLeakAll();//测试List集合类造成内存泄露
         testStaticMemoryLeakAll();//测试Static关键字修饰的成员变量造成内存泄露
     }
-    /////////////////////////////////////测试解决List集合类内存泄漏方式：testListMemoryLeakAll()//////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////测试解决Static关键字修饰的成员变量造成内存泄漏方式：testListMemoryLeakAll()//////////////////////////////////////////////////////////////////////
+/*
+储备知识:被 Static 关键字修饰的成员变量的生命周期 = 应用程序的生命周期
+泄露原因:若使被 Static 关键字修饰的成员变量 引用耗费资源过多的实例（如Context），则容易出现该成员变量的生命周期 > 引用实例生命周期的情况，
+当引用实例需结束生命周期销毁时，会因静态变量的持有而无法被回收，从而出现内存泄露
+解决方案
+a 尽量避免 Static 成员变量引用资源耗费过多的实例（如 Context）,若需引用 Context，则尽量使用Applicaiton的Context
+b 使用 弱引用（WeakReference） 代替 强引用 持有实例
+ */
     public void testStaticMemoryLeakAll(){
-        testStaticMemoryLeak1();
+        testStaticMemoryLeak1();//注意：这里可能无测试效果，因为只有一个activity，退出后，Application也退出了，生命周期也就结束了。
     }
-    /////////////////////////////////////测试解决Static关键字修饰的成员变量造成内存泄漏方式1：//////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////测试Static关键字修饰的成员变量造成内存泄漏方式1：//////////////////////////////////////////////////////////////////////
+/*
+注：静态成员变量有个非常典型的例子 = 单例模式
+储备知识: 单例模式 由于其静态特性，其生命周期的长度 = 应用程序的生命周期
+泄露原因: 若1个对象已不需再使用 而单例对象还持有该对象的引用，那么该对象将不能被正常回收 从而 导致内存泄漏
+实例演示
+ */
     public void testStaticMemoryLeak1(){//测试Static关键字修饰的成员变量造成内存泄露
-
+        SingleInstanceClass mSingleInstanceClass = new SingleInstanceClass(CameraActivity.this);//CameraActivity Context
     }
+    /////////////////////////////////////解决Static关键字修饰的成员变量造成内存泄漏方式1：//////////////////////////////////////////////////////////////////////
+/*
+解决方案:单例模式引用的对象的生命周期 = 应用的生命周期
+如上述实例，应传递Application的Context，因Application的生命周期 = 整个应用的生命周期
+ */
     public void testSolveStaticMemoryLeak1(){//解决Static关键字修饰的成员变量造成内存泄露
-
+        SolveSingleInstanceClass mSolveSingleInstanceClass = new SolveSingleInstanceClass(CameraActivity.this);//CameraActivity Context,再获取Application 的context
     }
-        /////////////////////////////////////测试解决List集合类内存泄漏方式：testListMemoryLeakAll()//////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////测试解决List集合类内存泄漏方式：testListMemoryLeakAll()//////////////////////////////////////////////////////////////////////
     public void testListMemoryLeakAll(){
         testListMemoryLeak1();
     }
@@ -1667,4 +1686,37 @@ class Constants {
     public static int SUB1_2_MAIN = 0;
     public static int MAIN_2_SUB2 = 1;
     public static int SUB_2_SUB = 2;
+}
+// 创建单例时，需传入一个Context
+// 若传入的是Activity的Context，此时单例 则持有该Activity的引用
+// 由于单例一直持有该Activity的引用（直到整个应用生命周期结束），即使该Activity退出，该Activity的内存也不会被回收
+// 特别是一些庞大的Activity，此处非常容易导致OOM
+class SingleInstanceClass {
+    private static SingleInstanceClass instance;
+    private Context mContext;
+    public SingleInstanceClass(Context context) {
+        this.mContext = context; // 传递的是Activity的context
+    }
+    public SingleInstanceClass getInstance(Context context) {
+        if (instance == null) {
+            instance = new SingleInstanceClass(context);
+        }
+        return instance;
+    }
+}
+//单例模式引用的对象的生命周期 = 应用的生命周期
+//如上述实例，应传递Application的Context，因Application的生命周期 = 整个应用的生命周期
+class SolveSingleInstanceClass {
+    private static SolveSingleInstanceClass instance;
+    private Context mContext;
+    public SolveSingleInstanceClass(Context context) {
+        this.mContext = context.getApplicationContext(); // 传递的是Application 的context
+    }
+
+    public SolveSingleInstanceClass getInstance(Context context) {
+        if (instance == null) {
+            instance = new SolveSingleInstanceClass(context);
+        }
+        return instance;
+    }
 }
