@@ -637,6 +637,48 @@ Runnable 接口的类的实例。
         testHandlerMemoryLeakAll();//测试Handler造成内存泄露
         testListMemoryLeakAll();//测试List集合类造成内存泄露
         testStaticMemoryLeakAll();//测试Static关键字修饰的成员变量造成内存泄露
+        testInnerClassMemoryLeakAll();//测试非静态内部类 / 匿名类造成内存泄露
+    }
+    /////////////////////////////////////测试非静态内部类 / 匿名类造成内存泄露方式：testInnerClassMemoryLeakAll()//////////////////////////////////////////////////////////////////////
+    /*
+    非静态内部类 / 匿名类
+储备知识：非静态内部类 / 匿名类 默认持有 外部类的引用；而静态内部类则不会
+常见情况：3种，分别是：非静态内部类的实例 = 静态、多线程、消息传递机制（Handler）
+
+    非静态内部类的实例 = 静态
+泄露原因：若 非静态内部类所创建的实例 = 静态（其生命周期 = 应用的生命周期），会因 非静态内部类默认持有外部类的引用 而导致外部类无法释放，最终 造成内存泄露
+     */
+    public void testInnerClassMemoryLeakAll(){
+        testInnerClassMemoryLeak1();//
+    }
+
+    // 造成内存泄露的原因：
+    // a. 当TestActivity销毁时，因非静态内部类单例的引用（innerClass）的生命周期 = 应用App的生命周期、持有外部类TestActivity的引用
+    // b. 故 TestActivity无法被GC回收，从而导致内存泄漏
+    public static InnerClass innerClass = null;    // 非静态内部类的实例的引用，注：设置为静态，生命周期 = 应用App的生命周期、持有外部类TestActivity的引用
+    public void testInnerClassMemoryLeak1(){//测试非静态内部类 / 匿名类造成内存泄露
+        // 保证非静态内部类的实例只有1个
+        if (innerClass == null)
+            innerClass = new InnerClass();
+    }
+
+    public void testSolveInnerClassMemoryLeak1(){//解决非静态内部类 / 匿名类造成内存泄露
+//        解决方案：
+//        1：将非静态内部类设置为：静态内部类（静态内部类默认不持有外部类的引用）
+             /*
+                 // 非静态内部类的定义
+                private static class InnerClass {
+                    //...
+                }
+              */
+//       :2：该内部类抽取出来封装成一个单例
+
+//       :3：尽量 避免 非静态内部类所创建的实例 = 静态
+             //定义为public InnerClass innerClass = null;  //非静态实例引用
+    }
+    // 非静态内部类的定义
+    private class InnerClass {
+        //...
     }
     /////////////////////////////////////测试解决Static关键字修饰的成员变量造成内存泄漏方式：testListMemoryLeakAll()//////////////////////////////////////////////////////////////////////
 /*
@@ -650,7 +692,6 @@ b 使用 弱引用（WeakReference） 代替 强引用 持有实例
     public void testStaticMemoryLeakAll(){
         testStaticMemoryLeak1();//注意：这里可能无测试效果，因为只有一个activity，退出后，Application也退出了，生命周期也就结束了。
     }
-    /////////////////////////////////////测试Static关键字修饰的成员变量造成内存泄漏方式1：//////////////////////////////////////////////////////////////////////
 /*
 注：静态成员变量有个非常典型的例子 = 单例模式
 储备知识: 单例模式 由于其静态特性，其生命周期的长度 = 应用程序的生命周期
@@ -660,7 +701,6 @@ b 使用 弱引用（WeakReference） 代替 强引用 持有实例
     public void testStaticMemoryLeak1(){//测试Static关键字修饰的成员变量造成内存泄露
         SingleInstanceClass mSingleInstanceClass = new SingleInstanceClass(CameraActivity.this);//CameraActivity Context
     }
-    /////////////////////////////////////解决Static关键字修饰的成员变量造成内存泄漏方式1：//////////////////////////////////////////////////////////////////////
 /*
 解决方案:单例模式引用的对象的生命周期 = 应用的生命周期
 如上述实例，应传递Application的Context，因Application的生命周期 = 整个应用的生命周期
@@ -672,7 +712,7 @@ b 使用 弱引用（WeakReference） 代替 强引用 持有实例
     public void testListMemoryLeakAll(){
         testListMemoryLeak1();
     }
-    /////////////////////////////////////测试解决List集合类内存泄漏方式1：//////////////////////////////////////////////////////////////////////
+
     // 通过 循环申请Object 对象 & 将申请的对象逐个放入到集合List
     List<Object> objectList = new ArrayList<>();
     public void testListMemoryLeak1(){//测试List集合类内存泄漏
@@ -926,7 +966,7 @@ b 使用 弱引用（WeakReference） 代替 强引用 持有实例
     }
     /////////////////////////////////////解决handler内存泄漏方式2：testSolveHandlerMemoryLeak2()//////////////////////////////////////////////////////////////////////
     public void testSolveHandlerMemoryLeak2(){
-        showhandler.removeCallbacksAndMessages(null);// 外部类Activity生命周期结束时，同时清空消息队列 & 结束Handler生命周期
+        showhandler.removeCallbacksAndMessages(null);// 外部类Activity生命周期结束onDestroy()时，同时清空消息队列 & 结束Handler生命周期
     }
 
 
