@@ -96,8 +96,8 @@ public class CameraActivity extends AppCompatActivity {
             teststartService();//测试后台服务
         }else if(switchFunc == 0){//在hello world demo中测试单个测试项
             setContentView(R.layout.activity_main);
-//            testListMemoryLeak1();
-//            testSolveListMemoryLeak1();
+            testListMemoryLeak1(); //出现内存泄漏，见：testListMemoryLeak1.hprof.7z
+//            testSolveListMemoryLeak1(); //打开则解决内存泄漏，见：testSolveListMemoryLeak1.hprof.7z
         }
     }
 
@@ -748,11 +748,11 @@ b 使用 弱引用（WeakReference） 代替 强引用 持有实例
     }
 
     // 通过 循环申请Object 对象 & 将申请的对象逐个放入到集合List
-    List<Object> objectList = new ArrayList<>();
+    List<Object> bruceListMemoryLeak = new ArrayList<>();
     public void testListMemoryLeak1(){//测试List集合类内存泄漏
         for (int i = 0; i < 1000000; i++) {
             Object o = new Object();
-            objectList.add(o);
+            bruceListMemoryLeak.add(o);
             // 虽释放了集合元素引用的本身：o=null）
             // 但集合List 仍然引用该对象，故垃圾回收器GC 依然不可回收该对象
             o = null;
@@ -760,8 +760,8 @@ b 使用 弱引用（WeakReference） 代替 强引用 持有实例
     }
     public void testSolveListMemoryLeak1(){//解决List集合类内存泄漏
         // 释放objectList
-        objectList.clear();
-        objectList=null;
+        bruceListMemoryLeak.clear();
+        bruceListMemoryLeak=null;
     }
     /////////////////////////////////////测试解决handler内存泄漏方式：testHandlerMemoryLeakAll()//////////////////////////////////////////////////////////////////////
     public void testHandlerMemoryLeakAll(){
