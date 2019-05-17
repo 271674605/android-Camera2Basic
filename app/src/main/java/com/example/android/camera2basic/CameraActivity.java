@@ -96,6 +96,8 @@ public class CameraActivity extends AppCompatActivity {
             teststartService();//测试后台服务
         }else if(switchFunc == 0){//在hello world demo中测试单个测试项
             setContentView(R.layout.activity_main);
+//            testListMemoryLeak1();
+//            testSolveListMemoryLeak1();
         }
     }
 
@@ -638,6 +640,38 @@ Runnable 接口的类的实例。
         testListMemoryLeakAll();//测试List集合类造成内存泄露
         testStaticMemoryLeakAll();//测试Static关键字修饰的成员变量造成内存泄露
         testInnerClassMemoryLeakAll();//测试非静态内部类 / 匿名类造成内存泄露
+        testFreeResourceMemoryLeakAll();//测试未释放资源造成内存泄露
+    }
+
+    /////////////////////////////////////测试非静态内部类 / 匿名类造成内存泄露方式：testInnerClassMemoryLeakAll()//////////////////////////////////////////////////////////////////////
+    /*
+资源对象使用后未关闭
+泄露原因：对于资源的使用（如 广播BraodcastReceiver、文件流File、数据库游标Cursor、图片资源Bitmap等），若在Activity销毁时无及时关闭 / 注销这些资源，则这些资源将不会被回收，从而造成内存泄漏
+解决方案：在Activity销毁时 及时关闭 / 注销资源
+     */
+    public void testFreeResourceMemoryLeakAll(){
+        testFreeResourceMemoryLeak1();//
+    }
+    public void testFreeResourceMemoryLeak1(){
+
+    }
+    public void testSolveFreeResourceMemoryLeak1(){
+// 对于 广播BraodcastReceiver：注销注册
+        //unregisterReceiver();
+
+// 对于 文件流File：关闭流
+        //InputStream / OutputStream.close()
+
+// 对于数据库游标cursor：使用后关闭游标
+        //cursor.close（）
+
+// 对于 图片资源Bitmap：Android分配给图片的内存只有8M，若1个Bitmap对象占内存较多，当它不再被使用时，应调用recycle()回收此对象的像素所占用的内存；最后再赋为null
+//        Bitmap.recycle()；
+//        Bitmap = null;
+
+// 对于动画（属性动画）
+// 将动画设置成无限循环播放repeatCount = “infinite”后
+// 在Activity退出时记得停止动画
     }
     /////////////////////////////////////测试非静态内部类 / 匿名类造成内存泄露方式：testInnerClassMemoryLeakAll()//////////////////////////////////////////////////////////////////////
     /*
@@ -716,7 +750,7 @@ b 使用 弱引用（WeakReference） 代替 强引用 持有实例
     // 通过 循环申请Object 对象 & 将申请的对象逐个放入到集合List
     List<Object> objectList = new ArrayList<>();
     public void testListMemoryLeak1(){//测试List集合类内存泄漏
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 1000000; i++) {
             Object o = new Object();
             objectList.add(o);
             // 虽释放了集合元素引用的本身：o=null）
