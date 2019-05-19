@@ -1,1 +1,0 @@
-Allocation Tracker(AS)工具比Allocation Tracker(Eclipse)工具强大的地方是更炫酷，更清晰，但是能做的事情都是一样的。
