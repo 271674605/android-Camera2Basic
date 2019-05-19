@@ -35,7 +35,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
+        <activity android:name=".TestActivity"></activity>
         <service android:name=".MyService">
             <intent-filter>
                 <action android:name="om.example.android.camera2basic.MY_SERVICE"/>

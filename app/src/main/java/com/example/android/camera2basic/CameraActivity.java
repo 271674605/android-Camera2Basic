@@ -35,6 +35,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -96,8 +97,11 @@ public class CameraActivity extends AppCompatActivity {
             teststartService();//测试后台服务
         }else if(switchFunc == 0){//在hello world demo中测试单个测试项
             setContentView(R.layout.activity_main);
-            testListMemoryLeak1(); //出现内存泄漏，见：testListMemoryLeak1.hprof.7z
-//            testSolveListMemoryLeak1(); //打开则解决内存泄漏，见：testSolveListMemoryLeak1.hprof.7z
+            Log.i(TAG,"testInnerClassMemoryLeak1 start");
+            testInnerClassMemoryLeak1(); //出现内存泄漏，见：testListMemoryLeak1.hprof.7z
+            Log.i(TAG,"testInnerClassMemoryLeak1 end");
+            //testSolveListMemoryLeak1(); //打开则解决内存泄漏，见：testSolveListMemoryLeak1.hprof.7z
+            //Log.i(TAG,"testSolveListMemoryLeak1 start");
         }
     }
 
@@ -689,11 +693,13 @@ Runnable 接口的类的实例。
     // 造成内存泄露的原因：
     // a. 当TestActivity销毁时，因非静态内部类单例的引用（innerClass）的生命周期 = 应用App的生命周期、持有外部类TestActivity的引用
     // b. 故 TestActivity无法被GC回收，从而导致内存泄漏
-    public static InnerClass innerClass = null;    // 非静态内部类的实例的引用，注：设置为静态，生命周期 = 应用App的生命周期、持有外部类TestActivity的引用
     public void testInnerClassMemoryLeak1(){//测试非静态内部类 / 匿名类造成内存泄露
-        // 保证非静态内部类的实例只有1个
-        if (innerClass == null)
-            innerClass = new InnerClass();
+        Intent intent=new Intent();
+        intent.setClass(CameraActivity.this, TestActivity.class);
+        //封装数据
+        Bundle bundle=new Bundle();
+        intent.putExtras(bundle);
+        startActivity(intent);
     }
 
     public void testSolveInnerClassMemoryLeak1(){//解决非静态内部类 / 匿名类造成内存泄露
@@ -709,10 +715,6 @@ Runnable 接口的类的实例。
 
 //       :3：尽量 避免 非静态内部类所创建的实例 = 静态
              //定义为public InnerClass innerClass = null;  //非静态实例引用
-    }
-    // 非静态内部类的定义
-    private class InnerClass {
-        //...
     }
     /////////////////////////////////////测试解决Static关键字修饰的成员变量造成内存泄漏方式：testListMemoryLeakAll()//////////////////////////////////////////////////////////////////////
 /*
@@ -746,7 +748,9 @@ b 使用 弱引用（WeakReference） 代替 强引用 持有实例
     public void testListMemoryLeakAll(){
         testListMemoryLeak1();
     }
-
+    public void click(View view) {
+        testListMemoryLeak1();
+    }
     // 通过 循环申请Object 对象 & 将申请的对象逐个放入到集合List
     List<Object> bruceListMemoryLeak = new ArrayList<>();
     public void testListMemoryLeak1(){//测试List集合类内存泄漏
