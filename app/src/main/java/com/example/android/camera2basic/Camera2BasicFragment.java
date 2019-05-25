@@ -70,7 +70,82 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+/* 拍照预览流程图
+1-> public void onResume() {
+  2-> startBackgroundThread();	//为相机开启了一个后台线程，这个进程用于后台执行保存图片等相关的工作
+    3-> mBackgroundThread = new HandlerThread("bruceCameraBackground");
+    3-> mBackgroundThread.start();
+    3-> mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
+  2-> if (mTextureView.isAvailable()) {openCamera(mTextureView.getWidth(), mTextureView.getHeight());	//mTextureView已经创建，SurfaceTexture已经有效，则直接openCamera，用于屏幕熄灭等情况，这时onSurfaceTextureAvailable不会回调。
+  2-> else {mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);		//SurfaceTexture处于无效状态中，则通过SurfaceTextureListener确保surface准备好。
+	3-> public void onSurfaceTextureAvailable(SurfaceTexture texture, int width, int height) {
+      4-> openCamera(width, height);		//SurfaceTexture有效即可openCamera
+        5-> requestCameraPermission();//请求权限
+        5-> setUpCameraOutputs(width, height);//包括对相机设备的选择，ImageReader的初始化和参数、回调设置。设置显示的转化矩阵，即将预览的图片调整至显示图层的大小。
+          6-> for (String cameraId : manager.getCameraIdList()) {//获取摄像头可用列表
+          6-> CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);////获取相机的特性
+          6-> Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);// 不使用前置摄像头
+          6-> mImageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),ImageFormat.JPEG, 2);//设置ImageReader接收的图片格式，以及允许接收的最大图片数目
+          6-> mImageReader.setOnImageAvailableListener(mOnImageAvailableListener, mBackgroundHandler);//设置图片存储的监听，但在创建会话，调用capture后才能有数据
+            7-> public void onImageAvailable(ImageReader reader) {//图片有效回调
+              8-> reader.acquireNextImage()//获取图片image
+              8-> mBackgroundHandler.post(new ImageSaver(reader.acquireNextImage(), mFile));///通知ImageSaver线程保存图片
+                9-> private static class ImageSaver implements Runnable {//保存图片线程 
+                  10-> public void run() {
+                    11-> output = new FileOutputStream(mFile);output.write(bytes);//保存图片到文件
+          6-> int displayRotation = activity.getWindowManager().getDefaultDisplay().getRotation();//获取显示方向
+          6-> mSensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);//获取sensor方向
+          6-> mPreviewSize = chooseOptimalSize(map.getOutputSizes(SurfaceTexture.class),//获取最优的预览分辨率
+          6-> mTextureView.setAspectRatio(mPreviewSize.getWidth(), mPreviewSize.getHeight());//设置TextureView预览分辨率
+        5-> configureTransform(width, height);//配置transformation，主要是矩阵旋转相关
+        5-> CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
+        5-> manager.openCamera(mCameraId, mStateCallback, mBackgroundHandler);//打开相机---------------------
+          6-> private final CameraDevice.StateCallback mStateCallback = new CameraDevice.StateCallback() {//打开相机设备状态回调---------------------
+            7-> public void onError(@NonNull CameraDevice cameraDevice, int error) {//打开错误  
+            7-> public void onDisconnected(@NonNull CameraDevice cameraDevice) {//断开相机
+            7-> public void onOpened(@NonNull CameraDevice cameraDevice) {//打开成功
+              8-> createCameraPreviewSession();//创建会话
+                9-> texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());//设置TextureView大小 
+                9-> Surface surface = new Surface(texture);//创建Surface来预览
+                9-> mPreviewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);//创建CaptureRequest.Builder
+                9-> mPreviewRequestBuilder.addTarget(surface);//CaptureRequest.Builder中添加Surface
+                9-> mCameraDevice.createCaptureSession(Arrays.asList(surface, mImageReader.getSurface()),new CameraCaptureSession.StateCallback() {//创建会话---------------------
+                  10-> public void onConfigureFailed(//创建会话失败
+                  10-> public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {//创建会话成功
+                    11-> mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);//设置AF自动对焦模式
+                    11-> mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);//设置AE模式
+                    11-> mPreviewRequest = mPreviewRequestBuilder.build();//转换为CaptureRequest
+                    11-> mCaptureSession.setRepeatingRequest(mPreviewRequest,mCaptureCallback, mBackgroundHandler);//设置预览，和拍照是同一个回调mCaptureCallback---------------------
+                      12-> private CameraCaptureSession.CaptureCallback mCaptureCallback = new CameraCaptureSession.CaptureCallback() {//预览回调---------------------
+                        13-> public void onCaptureProgressed(@NonNull CameraCaptureSession session,@NonNull CaptureRequest request,@NonNull CaptureResult partialResult) {//预览过程中
+                        13-> public void onCaptureCompleted(@NonNull CameraCaptureSession session,@NonNull CaptureRequest request,@NonNull TotalCaptureResult result) {//预览完成，和拍照是同一个回调mCaptureCallback
+                          14-> process(result); 
+                            15-> case STATE_PREVIEW: {//预览状态，则什么都不做
+                            15-> case STATE_WAITING_LOCK: {//等待焦点被锁时，由设置拍照流时设置的STATE_WAITING_LOCK
+                              16->captureStillPicture();//进行拍照
+                                17-> final CaptureRequest.Builder captureBuilder =  mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);//设置拍照CaptureRequest.Builder
+                                17-> captureBuilder.addTarget(mImageReader.getSurface());//添加拍照mImageReader为Surface
+                                17-> captureBuilder.set(CaptureRequest.CONTROL_AF_MODE,CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);//设置AF
+                                17-> captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getOrientation(rotation));//设置图片方向
+                                17-> mCaptureSession.stopRepeating();//停止预览 
+                                17-> mCaptureSession.abortCaptures();//中断Capture
+                                17-> mCaptureSession.capture(captureBuilder.build(), CaptureCallback, null);//重新Capture进行拍照，这时mImageReader的回调会执行并保存图片---------------------
+                                  18-> CameraCaptureSession.CaptureCallback CaptureCallback  = new CameraCaptureSession.CaptureCallback() { //拍照流程执行完成回调---------------------
+                                    19-> public void onCaptureCompleted(@NonNull CameraCaptureSession session,
+                                      20-> showToast("Saved: " + mFile);//提示拍照图片已经保存
+3-> public void onSurfaceTextureSizeChanged(SurfaceTexture texture, int width, int height) { 
+      4-> configureTransform(width, height);
+3-> public boolean onSurfaceTextureDestroyed(SurfaceTexture texture) {
+    3-> public void onSurfaceTextureUpdated(SurfaceTexture texture) { 
+      4-> //镜像模式获取bitmap
+1-> public void onClick(View view) {
+  2-> takePicture();//拍照
+    3-> lockFocus() {//拍照过程中锁住焦点
+      4-> mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START); //设置AF
+      4-> mState = STATE_WAITING_LOCK;
+      4-> mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback,mBackgroundHandler);//设置拍照，和预览是同一个回调mCaptureCallback，，只是等待焦点被锁，切换为STATE_WAITING_LOCK再真正进行拍照---------------------
 
+*/
 public class Camera2BasicFragment extends Fragment
         implements View.OnClickListener, ActivityCompat.OnRequestPermissionsResultCallback {
 
@@ -137,7 +212,7 @@ public class Camera2BasicFragment extends Fragment
 
         @Override
         public void onSurfaceTextureAvailable(SurfaceTexture texture, int width, int height) {
-            openCamera(width, height);
+            openCamera(width, height);//SurfaceTexture有效即可openCamera
         }
 
         @Override
@@ -184,25 +259,25 @@ public class Camera2BasicFragment extends Fragment
     /**
      * {@link CameraDevice.StateCallback} is called when {@link CameraDevice} changes its state.
      */
-    private final CameraDevice.StateCallback mStateCallback = new CameraDevice.StateCallback() {
+    private final CameraDevice.StateCallback mStateCallback = new CameraDevice.StateCallback() {//打开相机设备状态回调
 
         @Override
-        public void onOpened(@NonNull CameraDevice cameraDevice) {
+        public void onOpened(@NonNull CameraDevice cameraDevice) {//打开成功
             // This method is called when the camera is opened.  We start camera preview here.
             mCameraOpenCloseLock.release();
             mCameraDevice = cameraDevice;
-            createCameraPreviewSession();
+            createCameraPreviewSession();//创建会话
         }
 
         @Override
-        public void onDisconnected(@NonNull CameraDevice cameraDevice) {
+        public void onDisconnected(@NonNull CameraDevice cameraDevice) {//断开相机
             mCameraOpenCloseLock.release();
             cameraDevice.close();
             mCameraDevice = null;
         }
 
         @Override
-        public void onError(@NonNull CameraDevice cameraDevice, int error) {
+        public void onError(@NonNull CameraDevice cameraDevice, int error) {//打开错误
             mCameraOpenCloseLock.release();
             cameraDevice.close();
             mCameraDevice = null;
@@ -242,8 +317,8 @@ public class Camera2BasicFragment extends Fragment
             = new ImageReader.OnImageAvailableListener() {
 
         @Override
-        public void onImageAvailable(ImageReader reader) {
-            mBackgroundHandler.post(new ImageSaver(reader.acquireNextImage(), mFile));
+        public void onImageAvailable(ImageReader reader) {//图片有效回调
+            mBackgroundHandler.post(new ImageSaver(reader.acquireNextImage(), mFile));//通知ImageSaver线程保存图片，//reader.acquireNextImage()获取图片image
         }
 
     };
@@ -284,18 +359,18 @@ public class Camera2BasicFragment extends Fragment
      * A {@link CameraCaptureSession.CaptureCallback} that handles events related to JPEG capture.
      */
     private CameraCaptureSession.CaptureCallback mCaptureCallback
-            = new CameraCaptureSession.CaptureCallback() {
+            = new CameraCaptureSession.CaptureCallback() {//预览回调
 
         private void process(CaptureResult result) {
             switch (mState) {
-                case STATE_PREVIEW: {
+                case STATE_PREVIEW: {//预览状态，则什么都不做
                     // We have nothing to do when the camera preview is working normally.
                     break;
                 }
-                case STATE_WAITING_LOCK: {
+                case STATE_WAITING_LOCK: {//等待焦点被锁时，由设置拍照流时设置的STATE_WAITING_LOCK
                     Integer afState = result.get(CaptureResult.CONTROL_AF_STATE);
                     if (afState == null) {
-                        captureStillPicture();
+                        captureStillPicture();//进行拍照
                     } else if (CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED == afState ||
                             CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED == afState) {
                         // CONTROL_AE_STATE can be null on some devices
@@ -335,14 +410,14 @@ public class Camera2BasicFragment extends Fragment
         @Override
         public void onCaptureProgressed(@NonNull CameraCaptureSession session,
                                         @NonNull CaptureRequest request,
-                                        @NonNull CaptureResult partialResult) {
+                                        @NonNull CaptureResult partialResult) {//预览过程中
             process(partialResult);
         }
 
         @Override
         public void onCaptureCompleted(@NonNull CameraCaptureSession session,
                                        @NonNull CaptureRequest request,
-                                       @NonNull TotalCaptureResult result) {
+                                       @NonNull TotalCaptureResult result) {//预览完成
             process(result);
         }
 
@@ -440,15 +515,15 @@ public class Camera2BasicFragment extends Fragment
     @Override
     public void onResume() {
         super.onResume();
-        startBackgroundThread();
+        startBackgroundThread();//为相机开启了一个后台线程，这个进程用于后台执行相关的工作
 
         // When the screen is turned off and turned back on, the SurfaceTexture is already
         // available, and "onSurfaceTextureAvailable" will not be called. In that case, we can open
         // a camera and start preview from here (otherwise, we wait until the surface is ready in
         // the SurfaceTextureListener).
-        if (mTextureView.isAvailable()) {
+        if (mTextureView.isAvailable()) {//mTextureView已经创建，SurfaceTexture已经有效，则直接openCamera，用于屏幕熄灭等情况，这时onSurfaceTextureAvailable不会回调。
             openCamera(mTextureView.getWidth(), mTextureView.getHeight());
-        } else {
+        } else {//SurfaceTexture处于无效状态中，则通过SurfaceTextureListener确保surface准备好。
             mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
         }
     }
@@ -488,16 +563,16 @@ public class Camera2BasicFragment extends Fragment
      * @param height The height of available size for camera preview
      */
     @SuppressWarnings("SuspiciousNameCombination")
-    private void setUpCameraOutputs(int width, int height) {
+    private void setUpCameraOutputs(int width, int height) {////包括对相机设备的选择，ImageReader的初始化和参数、回调设置。设置显示的转化矩阵，即将预览的图片调整至显示图层的大小。
         Activity activity = getActivity();
         CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
         try {
-            for (String cameraId : manager.getCameraIdList()) {
+            for (String cameraId : manager.getCameraIdList()) {//获取摄像头可用列表
                 CameraCharacteristics characteristics
-                        = manager.getCameraCharacteristics(cameraId);
+                        = manager.getCameraCharacteristics(cameraId);////获取相机的特性
 
                 // We don't use a front facing camera in this sample.
-                Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
+                Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);// 不使用前置摄像头
                 if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {
                     continue;
                 }
@@ -513,15 +588,15 @@ public class Camera2BasicFragment extends Fragment
                         Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
                         new CompareSizesByArea());
                 mImageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
-                        ImageFormat.JPEG, /*maxImages*/2);
+                        ImageFormat.JPEG, /*maxImages*/2);//设置ImageReader接收的图片格式，以及允许接收的最大图片数目
                 mImageReader.setOnImageAvailableListener(
-                        mOnImageAvailableListener, mBackgroundHandler);
+                        mOnImageAvailableListener, mBackgroundHandler);//设置图片存储的监听，但在创建会话，调用capture后才能有数据
 
                 // Find out if we need to swap dimension to get the preview size relative to sensor
                 // coordinate.
-                int displayRotation = activity.getWindowManager().getDefaultDisplay().getRotation();
+                int displayRotation = activity.getWindowManager().getDefaultDisplay().getRotation();//获取显示方向
                 //noinspection ConstantConditions
-                mSensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
+                mSensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);//获取sensor方向
                 boolean swappedDimensions = false;
                 switch (displayRotation) {
                     case Surface.ROTATION_0:
@@ -567,13 +642,13 @@ public class Camera2BasicFragment extends Fragment
                 // garbage capture data.
                 mPreviewSize = chooseOptimalSize(map.getOutputSizes(SurfaceTexture.class),
                         rotatedPreviewWidth, rotatedPreviewHeight, maxPreviewWidth,
-                        maxPreviewHeight, largest);
+                        maxPreviewHeight, largest);//获取最优的预览分辨率
 
                 // We fit the aspect ratio of TextureView to the size of preview we picked.
                 int orientation = getResources().getConfiguration().orientation;
                 if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
                     mTextureView.setAspectRatio(
-                            mPreviewSize.getWidth(), mPreviewSize.getHeight());
+                            mPreviewSize.getWidth(), mPreviewSize.getHeight());;//设置TextureView预览分辨率
                 } else {
                     mTextureView.setAspectRatio(
                             mPreviewSize.getHeight(), mPreviewSize.getWidth());
@@ -602,7 +677,7 @@ public class Camera2BasicFragment extends Fragment
     private void openCamera(int width, int height) {
         if (ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
-            requestCameraPermission();
+            requestCameraPermission();//请求权限
             return;
         }
         setUpCameraOutputs(width, height);
@@ -678,22 +753,22 @@ public class Camera2BasicFragment extends Fragment
             assert texture != null;
 
             // We configure the size of default buffer to be the size of camera preview we want.
-            texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
+            texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());//设置TextureView大小
 
             // This is the output Surface we need to start preview.
-            Surface surface = new Surface(texture);
+            Surface surface = new Surface(texture);//创建Surface来预览
 
             // We set up a CaptureRequest.Builder with the output Surface.
             mPreviewRequestBuilder
-                    = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-            mPreviewRequestBuilder.addTarget(surface);
+                    = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);//创建CaptureRequest.Builder
+            mPreviewRequestBuilder.addTarget(surface);//CaptureRequest.Builder中添加Surface
 
             // Here, we create a CameraCaptureSession for camera preview.
             mCameraDevice.createCaptureSession(Arrays.asList(surface, mImageReader.getSurface()),
-                    new CameraCaptureSession.StateCallback() {
+                    new CameraCaptureSession.StateCallback() {//创建会话
 
                         @Override
-                        public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
+                        public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {//创建会话成功
                             // The camera is already closed
                             if (null == mCameraDevice) {
                                 return;
@@ -704,21 +779,21 @@ public class Camera2BasicFragment extends Fragment
                             try {
                                 // Auto focus should be continuous for camera preview.
                                 mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
-                                        CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+                                        CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);//设置AF自动对焦模式
                                 // Flash is automatically enabled when necessary.
                                 setAutoFlash(mPreviewRequestBuilder);
 
                                 // Finally, we start displaying the camera preview.
-                                mPreviewRequest = mPreviewRequestBuilder.build();
+                                mPreviewRequest = mPreviewRequestBuilder.build();//转换为CaptureRequest
                                 mCaptureSession.setRepeatingRequest(mPreviewRequest,
-                                        mCaptureCallback, mBackgroundHandler);
+                                        mCaptureCallback, mBackgroundHandler);//设置预览
                             } catch (CameraAccessException e) {
                                 e.printStackTrace();
                             }
                         }
 
                         @Override
-                        public void onConfigureFailed(
+                        public void onConfigureFailed(//创建会话失败
                                 @NonNull CameraCaptureSession cameraCaptureSession) {
                             showToast("Failed");
                         }
@@ -737,7 +812,7 @@ public class Camera2BasicFragment extends Fragment
      * @param viewWidth  The width of `mTextureView`
      * @param viewHeight The height of `mTextureView`
      */
-    private void configureTransform(int viewWidth, int viewHeight) {
+    private void configureTransform(int viewWidth, int viewHeight) {//配置transformation，主要是矩阵旋转相关
         Activity activity = getActivity();
         if (null == mTextureView || null == mPreviewSize || null == activity) {
             return;
@@ -765,22 +840,22 @@ public class Camera2BasicFragment extends Fragment
     /**
      * Initiate a still image capture.
      */
-    private void takePicture() {
+    private void takePicture() {//拍照
         lockFocus();
     }
 
     /**
      * Lock the focus as the first step for a still image capture.
      */
-    private void lockFocus() {
+    private void lockFocus() {//拍照过程中锁住焦点
         try {
             // This is how to tell the camera to lock focus.
             mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
                     CameraMetadata.CONTROL_AF_TRIGGER_START);
             // Tell #mCaptureCallback to wait for the lock.
-            mState = STATE_WAITING_LOCK;
+            mState = STATE_WAITING_LOCK;//设置状态
             mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback,
-                    mBackgroundHandler);
+                    mBackgroundHandler);//设置拍照，和预览是同一个回调mCaptureCallback，只是等待焦点被锁，切换为STATE_WAITING_LOCK再真正进行拍照
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
@@ -808,7 +883,7 @@ public class Camera2BasicFragment extends Fragment
      * Capture a still picture. This method should be called when we get a response in
      * {@link #mCaptureCallback} from both {@link #lockFocus()}.
      */
-    private void captureStillPicture() {
+    private void captureStillPicture() {//进行拍照
         try {
             final Activity activity = getActivity();
             if (null == activity || null == mCameraDevice) {
@@ -816,34 +891,34 @@ public class Camera2BasicFragment extends Fragment
             }
             // This is the CaptureRequest.Builder that we use to take a picture.
             final CaptureRequest.Builder captureBuilder =
-                    mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
-            captureBuilder.addTarget(mImageReader.getSurface());
+                    mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);//设置拍照CaptureRequest.Builder
+            captureBuilder.addTarget(mImageReader.getSurface());//添加拍照mImageReader为Surface
 
             // Use the same AE and AF modes as the preview.
             captureBuilder.set(CaptureRequest.CONTROL_AF_MODE,
-                    CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+                    CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);//设置AF
             setAutoFlash(captureBuilder);
 
             // Orientation
             int rotation = activity.getWindowManager().getDefaultDisplay().getRotation();
-            captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getOrientation(rotation));
+            captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getOrientation(rotation));//设置图片方向
 
             CameraCaptureSession.CaptureCallback CaptureCallback
-                    = new CameraCaptureSession.CaptureCallback() {
+                    = new CameraCaptureSession.CaptureCallback() {//拍照流程执行完成回调
 
                 @Override
                 public void onCaptureCompleted(@NonNull CameraCaptureSession session,
                                                @NonNull CaptureRequest request,
                                                @NonNull TotalCaptureResult result) {
-                    showToast("Saved: " + mFile);
+                    showToast("Saved: " + mFile);//提示拍照图片已经保存
                     Log.d(TAG, mFile.toString());
                     unlockFocus();
                 }
             };
 
-            mCaptureSession.stopRepeating();
-            mCaptureSession.abortCaptures();
-            mCaptureSession.capture(captureBuilder.build(), CaptureCallback, null);
+            mCaptureSession.stopRepeating();//停止预览
+            mCaptureSession.abortCaptures();//中断Capture
+            mCaptureSession.capture(captureBuilder.build(), CaptureCallback, null);//重新Capture进行拍照，这时mImageReader的回调会执行并保存图片
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
@@ -888,7 +963,7 @@ public class Camera2BasicFragment extends Fragment
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.picture: {
-                takePicture();
+                takePicture();//拍照
                 break;
             }
             case R.id.info: {
@@ -914,7 +989,7 @@ public class Camera2BasicFragment extends Fragment
     /**
      * Saves a JPEG {@link Image} into the specified {@link File}.
      */
-    private static class ImageSaver implements Runnable {
+    private static class ImageSaver implements Runnable {//保存图片线程 
 
         /**
          * The JPEG image
@@ -939,7 +1014,7 @@ public class Camera2BasicFragment extends Fragment
             FileOutputStream output = null;
             try {
                 output = new FileOutputStream(mFile);
-                output.write(bytes);
+                output.write(bytes);//保存图片到文件
             } catch (IOException e) {
                 e.printStackTrace();
             } finally {
