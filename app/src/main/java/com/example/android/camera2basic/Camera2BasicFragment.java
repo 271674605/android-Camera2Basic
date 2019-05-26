@@ -105,9 +105,10 @@ import java.util.concurrent.TimeUnit;
             7-> public void onDisconnected(@NonNull CameraDevice cameraDevice) {//断开相机
             7-> public void onOpened(@NonNull CameraDevice cameraDevice) {//打开成功
               8-> createCameraPreviewSession();//创建会话
+                9-> SurfaceTexture texture = mTextureView.getSurfaceTexture();//获取SurfaceTexture
                 9-> texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());//设置TextureView大小 
                 9-> Surface surface = new Surface(texture);//创建Surface来预览
-                9-> mPreviewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);//创建CaptureRequest.Builder
+                9-> mPreviewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);//创建TEMPLATE_PREVIEW预览CaptureRequest.Builder
                 9-> mPreviewRequestBuilder.addTarget(surface);//CaptureRequest.Builder中添加Surface
                 9-> mCameraDevice.createCaptureSession(Arrays.asList(surface, mImageReader.getSurface()),new CameraCaptureSession.StateCallback() {//创建会话---------------------
                   10-> public void onConfigureFailed(//创建会话失败
@@ -123,7 +124,7 @@ import java.util.concurrent.TimeUnit;
                             15-> case STATE_PREVIEW: {//预览状态，则什么都不做
                             15-> case STATE_WAITING_LOCK: {//等待焦点被锁时，由设置拍照流时设置的STATE_WAITING_LOCK
                               16->captureStillPicture();//进行拍照
-                                17-> final CaptureRequest.Builder captureBuilder =  mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);//设置拍照CaptureRequest.Builder
+                                17-> final CaptureRequest.Builder captureBuilder =  mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);//设置TEMPLATE_STILL_CAPTURE拍照CaptureRequest.Builder
                                 17-> captureBuilder.addTarget(mImageReader.getSurface());//添加拍照mImageReader为Surface
                                 17-> captureBuilder.set(CaptureRequest.CONTROL_AF_MODE,CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);//设置AF
                                 17-> captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getOrientation(rotation));//设置图片方向
@@ -749,18 +750,18 @@ public class Camera2BasicFragment extends Fragment
      */
     private void createCameraPreviewSession() {
         try {
-            SurfaceTexture texture = mTextureView.getSurfaceTexture();
+            SurfaceTexture texture = mTextureView.getSurfaceTexture();//通过mTextureView获取SurfaceTexture
             assert texture != null;
 
             // We configure the size of default buffer to be the size of camera preview we want.
-            texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());//设置TextureView大小
+            texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());//设置SurfaceTexture大小
 
             // This is the output Surface we need to start preview.
-            Surface surface = new Surface(texture);//创建Surface来预览
+            Surface surface = new Surface(texture);//通过SurfaceTexture创建Surface来预览
 
             // We set up a CaptureRequest.Builder with the output Surface.
             mPreviewRequestBuilder
-                    = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);//创建CaptureRequest.Builder
+                    = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);//创建TEMPLATE_PREVIEW预览CaptureRequest.Builder
             mPreviewRequestBuilder.addTarget(surface);//CaptureRequest.Builder中添加Surface
 
             // Here, we create a CameraCaptureSession for camera preview.
@@ -891,7 +892,7 @@ public class Camera2BasicFragment extends Fragment
             }
             // This is the CaptureRequest.Builder that we use to take a picture.
             final CaptureRequest.Builder captureBuilder =
-                    mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);//设置拍照CaptureRequest.Builder
+                    mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);//设置TEMPLATE_STILL_CAPTURE拍照CaptureRequest.Builder
             captureBuilder.addTarget(mImageReader.getSurface());//添加拍照mImageReader为Surface
 
             // Use the same AE and AF modes as the preview.
