@@ -71,6 +71,8 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 /* 拍照预览流程图
+1-> public void onViewCreated(final View view, Bundle savedInstanceState) {
+  2-> mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);//获取mTextureView 
 1-> public void onResume() {
   2-> startBackgroundThread();	//为相机开启了一个后台线程，这个进程用于后台执行保存图片等相关的工作
     3-> mBackgroundThread = new HandlerThread("bruceCameraBackground");
@@ -217,7 +219,7 @@ public class Camera2BasicFragment extends Fragment
      * {@link TextureView}.
      */
     private final TextureView.SurfaceTextureListener mSurfaceTextureListener
-            = new TextureView.SurfaceTextureListener() {
+            = new TextureView.SurfaceTextureListener() {//TextureView回调
 
         @Override
         public void onSurfaceTextureAvailable(SurfaceTexture texture, int width, int height) {
@@ -235,7 +237,7 @@ public class Camera2BasicFragment extends Fragment
         }
 
         @Override
-        public void onSurfaceTextureUpdated(SurfaceTexture texture) {
+        public void onSurfaceTextureUpdated(SurfaceTexture texture) {//可获取bitmap
         }
 
     };
@@ -512,7 +514,7 @@ public class Camera2BasicFragment extends Fragment
     public void onViewCreated(final View view, Bundle savedInstanceState) {
         view.findViewById(R.id.picture).setOnClickListener(this);
         view.findViewById(R.id.info).setOnClickListener(this);
-        mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);
+        mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);//获取mTextureView
     }
 
     @Override
@@ -533,7 +535,7 @@ public class Camera2BasicFragment extends Fragment
         if (mTextureView.isAvailable()) {//mTextureView已经创建，SurfaceTexture已经有效，则直接openCamera，用于屏幕熄灭等情况，这时onSurfaceTextureAvailable不会回调。
             openCamera(mTextureView.getWidth(), mTextureView.getHeight());
         } else {//SurfaceTexture处于无效状态中，则通过SurfaceTextureListener确保surface准备好。
-            mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
+            mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);//设置mTextureView回调
         }
     }
 
@@ -657,7 +659,7 @@ public class Camera2BasicFragment extends Fragment
                 int orientation = getResources().getConfiguration().orientation;
                 if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
                     mTextureView.setAspectRatio(
-                            mPreviewSize.getWidth(), mPreviewSize.getHeight());;//设置TextureView预览分辨率
+                            mPreviewSize.getWidth(), mPreviewSize.getHeight());;//设置TextureView预览分辨率。
                 } else {
                     mTextureView.setAspectRatio(
                             mPreviewSize.getHeight(), mPreviewSize.getWidth());
@@ -758,19 +760,19 @@ public class Camera2BasicFragment extends Fragment
      */
     private void createCameraPreviewSession() {
         try {
-            SurfaceTexture texture = mTextureView.getSurfaceTexture();//通过mTextureView获取SurfaceTexture
+            SurfaceTexture texture = mTextureView.getSurfaceTexture();//通过mTextureView获取SurfaceTexture。
             assert texture != null;
 
             // We configure the size of default buffer to be the size of camera preview we want.
             texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());//设置SurfaceTexture大小
 
             // This is the output Surface we need to start preview.
-            Surface surface = new Surface(texture);//通过SurfaceTexture创建Surface来预览
+            Surface surface = new Surface(texture);//通过SurfaceTexture创建Surface来预览。
 
             // We set up a CaptureRequest.Builder with the output Surface.
             mPreviewRequestBuilder
                     = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);//创建TEMPLATE_PREVIEW预览CaptureRequest.Builder
-            mPreviewRequestBuilder.addTarget(surface);//CaptureRequest.Builder中添加Surface
+            mPreviewRequestBuilder.addTarget(surface);//CaptureRequest.Builder中添加Surface，即mTextureView获取创建的Surface
 
             // Here, we create a CameraCaptureSession for camera preview.
             mCameraDevice.createCaptureSession(Arrays.asList(surface, mImageReader.getSurface()),
@@ -843,7 +845,7 @@ public class Camera2BasicFragment extends Fragment
         } else if (Surface.ROTATION_180 == rotation) {
             matrix.postRotate(180, centerX, centerY);
         }
-        mTextureView.setTransform(matrix);
+        mTextureView.setTransform(matrix);//设置mTextureView的transformation
     }
 
     /**
