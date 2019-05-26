@@ -97,6 +97,7 @@ import java.util.concurrent.TimeUnit;
           6-> mSensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);//获取sensor方向
           6-> mPreviewSize = chooseOptimalSize(map.getOutputSizes(SurfaceTexture.class),//获取最优的预览分辨率
           6-> mTextureView.setAspectRatio(mPreviewSize.getWidth(), mPreviewSize.getHeight());//设置TextureView预览分辨率
+          6-> mCameraId = cameraId;//获取当前ID
         5-> configureTransform(width, height);//配置transformation，主要是矩阵旋转相关
         5-> CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
         5-> manager.openCamera(mCameraId, mStateCallback, mBackgroundHandler);//打开相机---------------------
@@ -104,6 +105,7 @@ import java.util.concurrent.TimeUnit;
             7-> public void onError(@NonNull CameraDevice cameraDevice, int error) {//打开错误  
             7-> public void onDisconnected(@NonNull CameraDevice cameraDevice) {//断开相机
             7-> public void onOpened(@NonNull CameraDevice cameraDevice) {//打开成功
+              8-> mCameraDevice = cameraDevice;//从onOpened参数获取mCameraDevice
               8-> createCameraPreviewSession();//创建会话
                 9-> SurfaceTexture texture = mTextureView.getSurfaceTexture();//获取SurfaceTexture
                 9-> texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());//设置TextureView大小 
@@ -113,6 +115,7 @@ import java.util.concurrent.TimeUnit;
                 9-> mCameraDevice.createCaptureSession(Arrays.asList(surface, mImageReader.getSurface()),new CameraCaptureSession.StateCallback() {//创建会话---------------------
                   10-> public void onConfigureFailed(//创建会话失败
                   10-> public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {//创建会话成功
+                    11-> mCaptureSession = cameraCaptureSession;//从onConfigured参数获取mCaptureSession
                     11-> mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);//设置AF自动对焦模式
                     11-> mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);//设置AE模式
                     11-> mPreviewRequest = mPreviewRequestBuilder.build();//转换为CaptureRequest
@@ -120,7 +123,7 @@ import java.util.concurrent.TimeUnit;
                       12-> private CameraCaptureSession.CaptureCallback mCaptureCallback = new CameraCaptureSession.CaptureCallback() {//预览回调---------------------
                         13-> public void onCaptureProgressed(@NonNull CameraCaptureSession session,@NonNull CaptureRequest request,@NonNull CaptureResult partialResult) {//预览过程中
                         13-> public void onCaptureCompleted(@NonNull CameraCaptureSession session,@NonNull CaptureRequest request,@NonNull TotalCaptureResult result) {//预览完成，和拍照是同一个回调mCaptureCallback
-                          14-> process(result); 
+                          14-> process(result); //从onCaptureCompleted参数获取CaptureResult
                             15-> case STATE_PREVIEW: {//预览状态，则什么都不做
                             15-> case STATE_WAITING_LOCK: {//等待焦点被锁时，由设置拍照流时设置的STATE_WAITING_LOCK
                               16->captureStillPicture();//进行拍照
@@ -134,6 +137,11 @@ import java.util.concurrent.TimeUnit;
                                   18-> CameraCaptureSession.CaptureCallback CaptureCallback  = new CameraCaptureSession.CaptureCallback() { //拍照流程执行完成回调---------------------
                                     19-> public void onCaptureCompleted(@NonNull CameraCaptureSession session,
                                       20-> showToast("Saved: " + mFile);//提示拍照图片已经保存
+                                      20-> unlockFocus();//释放焦点锁，重新开启预览。
+                                        21-> mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,CameraMetadata.CONTROL_AF_TRIGGER_CANCEL);//重新设置AE/AF
+                                        21-> mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback,mBackgroundHandler);//重新设置AE/AF,通过mPreviewRequestBuilder.build()只发送一次请求，而不是mPreviewRequest。
+                                        21-> mState = STATE_PREVIEW;//设置预览状态,通知mCaptureCallback回到预览状态
+                                        21-> mCaptureSession.setRepeatingRequest(mPreviewRequest, mCaptureCallback,mBackgroundHandler);//重新进入预览,使用mPreviewRequest
 3-> public void onSurfaceTextureSizeChanged(SurfaceTexture texture, int width, int height) { 
       4-> configureTransform(width, height);
 3-> public boolean onSurfaceTextureDestroyed(SurfaceTexture texture) {
@@ -142,9 +150,9 @@ import java.util.concurrent.TimeUnit;
 1-> public void onClick(View view) {
   2-> takePicture();//拍照
     3-> lockFocus() {//拍照过程中锁住焦点
-      4-> mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START); //设置AF
-      4-> mState = STATE_WAITING_LOCK;
-      4-> mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback,mBackgroundHandler);//设置拍照，和预览是同一个回调mCaptureCallback，，只是等待焦点被锁，切换为STATE_WAITING_LOCK再真正进行拍照---------------------
+      4-> mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START); //通知camera锁住对焦
+      4-> mState = STATE_WAITING_LOCK;//设置状态,通知mCaptureCallback等待锁定
+      4-> mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback,mBackgroundHandler);//通知camera锁住对焦和状态只发送一次请求，是同一个回调mCaptureCallback，只是等待焦点被锁，切换为STATE_WAITING_LOCK再真正进行拍照---------------------
 
 */
 public class Camera2BasicFragment extends Fragment
@@ -266,7 +274,7 @@ public class Camera2BasicFragment extends Fragment
         public void onOpened(@NonNull CameraDevice cameraDevice) {//打开成功
             // This method is called when the camera is opened.  We start camera preview here.
             mCameraOpenCloseLock.release();
-            mCameraDevice = cameraDevice;
+            mCameraDevice = cameraDevice;//从onOpened参数获取mCameraDevice
             createCameraPreviewSession();//创建会话
         }
 
@@ -419,7 +427,7 @@ public class Camera2BasicFragment extends Fragment
         public void onCaptureCompleted(@NonNull CameraCaptureSession session,
                                        @NonNull CaptureRequest request,
                                        @NonNull TotalCaptureResult result) {//预览完成
-            process(result);
+            process(result);//从onCaptureCompleted参数获取CaptureResult
         }
 
     };
@@ -659,7 +667,7 @@ public class Camera2BasicFragment extends Fragment
                 Boolean available = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE);
                 mFlashSupported = available == null ? false : available;
 
-                mCameraId = cameraId;
+                mCameraId = cameraId;//获取当前ID
                 return;
             }
         } catch (CameraAccessException e) {
@@ -776,7 +784,7 @@ public class Camera2BasicFragment extends Fragment
                             }
 
                             // When the session is ready, we start displaying the preview.
-                            mCaptureSession = cameraCaptureSession;
+                            mCaptureSession = cameraCaptureSession;//从onConfigured参数获取mCaptureSession
                             try {
                                 // Auto focus should be continuous for camera preview.
                                 mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE,
@@ -787,7 +795,7 @@ public class Camera2BasicFragment extends Fragment
                                 // Finally, we start displaying the camera preview.
                                 mPreviewRequest = mPreviewRequestBuilder.build();//转换为CaptureRequest
                                 mCaptureSession.setRepeatingRequest(mPreviewRequest,
-                                        mCaptureCallback, mBackgroundHandler);//设置预览
+                                        mCaptureCallback, mBackgroundHandler);//设置预览,setRepeatingRequest不断的重复mPreviewRequest请求捕捉画面，常用于预览或者连拍场景。
                             } catch (CameraAccessException e) {
                                 e.printStackTrace();
                             }
@@ -850,13 +858,13 @@ public class Camera2BasicFragment extends Fragment
      */
     private void lockFocus() {//拍照过程中锁住焦点
         try {
-            // This is how to tell the camera to lock focus.
+            // This is how to tell the camera to lock focus.通知camera锁住对焦
             mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
                     CameraMetadata.CONTROL_AF_TRIGGER_START);
-            // Tell #mCaptureCallback to wait for the lock.
-            mState = STATE_WAITING_LOCK;//设置状态
+            // Tell #mCaptureCallback to wait for the lock.通知mCaptureCallback等待锁定
+            mState = STATE_WAITING_LOCK;//设置状态,通知mCaptureCallback等待锁定
             mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback,
-                    mBackgroundHandler);//设置拍照，和预览是同一个回调mCaptureCallback，只是等待焦点被锁，切换为STATE_WAITING_LOCK再真正进行拍照
+                    mBackgroundHandler);//通知camera锁住对焦和状态通过mPreviewRequestBuilder.build()只发送一次请求，而不是mPreviewRequest。是同一个回调mCaptureCallback，发送一次请求只是等待焦点被锁，切换为STATE_WAITING_LOCK再真正进行拍照
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
@@ -895,9 +903,9 @@ public class Camera2BasicFragment extends Fragment
                     mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);//设置TEMPLATE_STILL_CAPTURE拍照CaptureRequest.Builder
             captureBuilder.addTarget(mImageReader.getSurface());//添加拍照mImageReader为Surface
 
-            // Use the same AE and AF modes as the preview.
+            // Use the same AE and AF modes as the preview.//设置AF和AE
             captureBuilder.set(CaptureRequest.CONTROL_AF_MODE,
-                    CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);//设置AF
+                    CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
             setAutoFlash(captureBuilder);
 
             // Orientation
@@ -913,12 +921,12 @@ public class Camera2BasicFragment extends Fragment
                                                @NonNull TotalCaptureResult result) {
                     showToast("Saved: " + mFile);//提示拍照图片已经保存
                     Log.d(TAG, mFile.toString());
-                    unlockFocus();
+                    unlockFocus();//释放焦点锁，重新开启预览。
                 }
             };
 
-            mCaptureSession.stopRepeating();//停止预览
-            mCaptureSession.abortCaptures();//中断Capture
+            mCaptureSession.stopRepeating();//停止预览,停止任何一个正常进行的重复请求。
+            mCaptureSession.abortCaptures();//中断Capture,尽可能快的取消当前队列中或正在处理中的所有捕捉请求。
             mCaptureSession.capture(captureBuilder.build(), CaptureCallback, null);//重新Capture进行拍照，这时mImageReader的回调会执行并保存图片
         } catch (CameraAccessException e) {
             e.printStackTrace();
@@ -947,14 +955,14 @@ public class Camera2BasicFragment extends Fragment
         try {
             // Reset the auto-focus trigger
             mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
-                    CameraMetadata.CONTROL_AF_TRIGGER_CANCEL);
+                    CameraMetadata.CONTROL_AF_TRIGGER_CANCEL);//重新设置AE/AF
             setAutoFlash(mPreviewRequestBuilder);
             mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback,
-                    mBackgroundHandler);
+                    mBackgroundHandler);//重新设置AE/AF,通过mPreviewRequestBuilder.build()只发送一次请求，而不是mPreviewRequest。
             // After this, the camera will go back to the normal state of preview.
-            mState = STATE_PREVIEW;
+            mState = STATE_PREVIEW;//设置预览状态,通知mCaptureCallback回到预览状态
             mCaptureSession.setRepeatingRequest(mPreviewRequest, mCaptureCallback,
-                    mBackgroundHandler);
+                    mBackgroundHandler);//重新进入预览,使用mPreviewRequest
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
