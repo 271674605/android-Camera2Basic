@@ -70,6 +70,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+
 /* 拍照预览流程图
 1-> public void onViewCreated(final View view, Bundle savedInstanceState) {
   2-> mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);//获取mTextureView 
@@ -157,7 +158,7 @@ import java.util.concurrent.TimeUnit;
       4-> mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback,mBackgroundHandler);//通知camera锁住对焦和状态只发送一次请求，是同一个回调mCaptureCallback，只是等待焦点被锁，切换为STATE_WAITING_LOCK再真正进行拍照---------------------
 
 */
-public class Camera2BasicFragment extends Fragment
+public class Camera2BasicFragment_GLSurfaceView extends Fragment
         implements View.OnClickListener, ActivityCompat.OnRequestPermissionsResultCallback {
 
     /**
@@ -177,7 +178,7 @@ public class Camera2BasicFragment extends Fragment
     /**
      * Tag for the {@link Log}.
      */
-    private static final String TAG = "Camera2BasicFragment";
+    private static final String TAG = "Camera2BasicFragment_GLSurfaceView";
 
     /**
      * Camera state: Showing camera preview.
@@ -263,7 +264,7 @@ public class Camera2BasicFragment extends Fragment
     private CameraDevice mCameraDevice;
 
     /**
-     * The {@link android.util.Size} of camera preview.
+     * The {@link Size} of camera preview.
      */
     private Size mPreviewSize;
 
@@ -500,8 +501,8 @@ public class Camera2BasicFragment extends Fragment
         }
     }
 
-    public static Camera2BasicFragment newInstance() {
-        return new Camera2BasicFragment();
+    public static Camera2BasicFragment_GLSurfaceView newInstance() {
+        return new Camera2BasicFragment_GLSurfaceView();
     }
 
     @Override
@@ -683,7 +684,7 @@ public class Camera2BasicFragment extends Fragment
     }
 
     /**
-     * Opens the camera specified by {@link Camera2BasicFragment#mCameraId}.
+     * Opens the camera specified by {@link Camera2BasicFragment_GLSurfaceView#mCameraId}.
      */
     private void openCamera(int width, int height) {
         if (ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.CAMERA)
@@ -816,7 +817,7 @@ public class Camera2BasicFragment extends Fragment
     }
 
     /**
-     * Configures the necessary {@link android.graphics.Matrix} transformation to `mTextureView`.
+     * Configures the necessary {@link Matrix} transformation to `mTextureView`.
      * This method should be called after the camera preview size is determined in
      * setUpCameraOutputs and also the size of `mTextureView` is fixed.
      *

@@ -57,7 +57,7 @@ import java.util.concurrent.TimeUnit;
 import android.os.Handler;
 import android.os.HandlerThread;
 public class CameraActivity extends AppCompatActivity {
-    public int switchFunc = 0;
+    public int switchFunc = 2;
     public String TAG = "bruce";
     // 声明Button
     /**Timer对象**/
@@ -76,13 +76,37 @@ public class CameraActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        if(switchFunc == 2) {//camera2basic默认功能
+        if(switchFunc == 4) {//camera2basic,改造成Camera2 GLSurfaceView实现
             setContentView(R.layout.activity_camera);
             if (null == savedInstanceState) {
                 getSupportFragmentManager().beginTransaction()
-                        .replace(R.id.container, Camera2BasicFragment.newInstance())
+                        .replace(R.id.container, Camera2BasicFragment_GLSurfaceView.newInstance())
                         .commit();
             }
+        }else if(switchFunc == 3) {//camera2basic,改造成Camera2 SurfaceView实现
+            setContentView(R.layout.activity_camera);
+            if (null == savedInstanceState) {
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.container, Camera2BasicFragment_SurfaveView.newInstance())
+                        .commit();
+            }
+        }else if(switchFunc == 2) {//camera2basic默认功能,Camera2 TextureView实现
+            setContentView(R.layout.activity_camera);
+            if (null == savedInstanceState) {
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.container, Camera2BasicFragment_TextureView.newInstance())
+                        .commit();
+            }
+        }else if(switchFunc == 1){//Service demo
+            teststartService();//测试后台服务
+        }else if(switchFunc == 0){//在hello world demo中测试单个测试项
+            setContentView(R.layout.activity_main);
+            Log.i(TAG,"testInnerClassMemoryLeak1 start");
+            testInnerClassMemoryLeak1(); //出现内存泄漏，见：testListMemoryLeak1.hprof.7z
+            Log.i(TAG,"testInnerClassMemoryLeak1 end");
+            //testSolveListMemoryLeak1(); //打开则解决内存泄漏，见：testSolveListMemoryLeak1.hprof.7z
+            //Log.i(TAG,"testSolveListMemoryLeak1 start");
+        }else{
             CreatThreadByAllMethod();//创建线程所有方式
             CreatThreadPoolByAllMethod();//创建线程池所有方式
             CreatHandlerByAllMethod();//创建Handler所有方式
@@ -93,15 +117,6 @@ public class CameraActivity extends AppCompatActivity {
             testSubThreadCallMainThreadAll();//子线程调用主线程所有方式
             testMemoryLeakAll();//测试内存泄露
             printThreadInProcess();//打印当前进程的所有线程信息
-        }else if(switchFunc == 1){//Service demo
-            teststartService();//测试后台服务
-        }else if(switchFunc == 0){//在hello world demo中测试单个测试项
-            setContentView(R.layout.activity_main);
-            Log.i(TAG,"testInnerClassMemoryLeak1 start");
-            testInnerClassMemoryLeak1(); //出现内存泄漏，见：testListMemoryLeak1.hprof.7z
-            Log.i(TAG,"testInnerClassMemoryLeak1 end");
-            //testSolveListMemoryLeak1(); //打开则解决内存泄漏，见：testSolveListMemoryLeak1.hprof.7z
-            //Log.i(TAG,"testSolveListMemoryLeak1 start");
         }
     }
 
