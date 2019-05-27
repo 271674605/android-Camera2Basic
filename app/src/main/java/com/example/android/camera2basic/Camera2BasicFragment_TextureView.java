@@ -178,7 +178,7 @@ public class Camera2BasicFragment_TextureView extends Fragment
     /**
      * Tag for the {@link Log}.
      */
-    private static final String TAG = "Camera2BasicFragment_TextureView";
+    private static final String TAG = "Fragment_TextureView";
 
     /**
      * Camera state: Showing camera preview.

@@ -57,7 +57,7 @@ import java.util.concurrent.TimeUnit;
 import android.os.Handler;
 import android.os.HandlerThread;
 public class CameraActivity extends AppCompatActivity {
-    public int switchFunc = 2;
+    public int switchFunc = 3;
     public String TAG = "bruce";
     // 声明Button
     /**Timer对象**/
@@ -83,7 +83,7 @@ public class CameraActivity extends AppCompatActivity {
                         .replace(R.id.container, Camera2BasicFragment_GLSurfaceView.newInstance())
                         .commit();
             }
-        }else if(switchFunc == 3) {//camera2basic,改造成Camera2 SurfaceView实现
+        }else if(switchFunc == 3) {//camera2basic,改造成Camera2 SurfaceView实现.
             setContentView(R.layout.activity_camera);
             if (null == savedInstanceState) {
                 getSupportFragmentManager().beginTransaction()

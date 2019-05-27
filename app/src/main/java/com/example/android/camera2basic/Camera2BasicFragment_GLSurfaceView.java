@@ -178,7 +178,7 @@ public class Camera2BasicFragment_GLSurfaceView extends Fragment
     /**
      * Tag for the {@link Log}.
      */
-    private static final String TAG = "Camera2BasicFragment_GLSurfaceView";
+    private static final String TAG = "Fragment_GLSurfaceView";
 
     /**
      * Camera state: Showing camera preview.
