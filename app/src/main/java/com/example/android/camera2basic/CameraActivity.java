@@ -57,7 +57,7 @@ import java.util.concurrent.TimeUnit;
 import android.os.Handler;
 import android.os.HandlerThread;
 public class CameraActivity extends AppCompatActivity {
-    public int switchFunc = 3;
+    public int switchFunc = 4;
     public String TAG = "bruce";
     // 声明Button
     /**Timer对象**/

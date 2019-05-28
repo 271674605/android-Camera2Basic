@@ -41,6 +41,7 @@ import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
+import android.opengl.GLSurfaceView;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -49,6 +50,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.DialogFragment;
 import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.Size;
 import android.util.SparseIntArray;
@@ -58,6 +60,8 @@ import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
+
+import com.example.android.camera2basic.opengles.CameraPreviewRenderer;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -219,6 +223,7 @@ public class Camera2BasicFragment_GLSurfaceView extends Fragment
      * {@link TextureView.SurfaceTextureListener} handles several lifecycle events on a
      * {@link TextureView}.
      */
+    /*
     private final TextureView.SurfaceTextureListener mSurfaceTextureListener
             = new TextureView.SurfaceTextureListener() {//TextureView回调
 
@@ -242,7 +247,7 @@ public class Camera2BasicFragment_GLSurfaceView extends Fragment
         }
 
     };
-
+*/
     /**
      * ID of the current {@link CameraDevice}.
      */
@@ -251,8 +256,11 @@ public class Camera2BasicFragment_GLSurfaceView extends Fragment
     /**
      * An {@link AutoFitTextureView} for camera preview.
      */
-    private AutoFitTextureView mTextureView;
-
+    //private AutoFitTextureView mTextureView;
+    private GLSurfaceView mGlSurfaceView;
+    private DisplayMetrics dm = new DisplayMetrics();
+    private CameraPreviewRenderer mCameraPreviewRenderer;
+    private SurfaceTexture mSurfaceTexture;
     /**
      * A {@link CameraCaptureSession } for camera preview.
      */
@@ -278,7 +286,7 @@ public class Camera2BasicFragment_GLSurfaceView extends Fragment
             // This method is called when the camera is opened.  We start camera preview here.
             mCameraOpenCloseLock.release();
             mCameraDevice = cameraDevice;//从onOpened参数获取mCameraDevice
-            createCameraPreviewSession();//创建会话
+            //createCameraPreviewSession();//创建会话
         }
 
         @Override
@@ -508,14 +516,17 @@ public class Camera2BasicFragment_GLSurfaceView extends Fragment
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_camera2_basic, container, false);
+        return inflater.inflate(R.layout.fragment_camera2_basic_glsurfaceview, container, false);
     }
 
     @Override
     public void onViewCreated(final View view, Bundle savedInstanceState) {
         view.findViewById(R.id.picture).setOnClickListener(this);
         view.findViewById(R.id.info).setOnClickListener(this);
-        mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);//获取mTextureView
+        //mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);//获取mTextureView
+        getActivity().getWindowManager().getDefaultDisplay().getMetrics(dm);
+        mGlSurfaceView = (GLSurfaceView) view.findViewById(R.id.glsurfaceview);
+        mGlSurfaceView.setEGLContextClientVersion(2);
     }
 
     @Override
@@ -533,13 +544,21 @@ public class Camera2BasicFragment_GLSurfaceView extends Fragment
         // available, and "onSurfaceTextureAvailable" will not be called. In that case, we can open
         // a camera and start preview from here (otherwise, we wait until the surface is ready in
         // the SurfaceTextureListener).
+        /*
         if (mTextureView.isAvailable()) {//mTextureView已经创建，SurfaceTexture已经有效，则直接openCamera，用于屏幕熄灭等情况，这时onSurfaceTextureAvailable不会回调。
             openCamera(mTextureView.getWidth(), mTextureView.getHeight());
         } else {//SurfaceTexture处于无效状态中，则通过SurfaceTextureListener确保surface准备好。
             mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);//设置mTextureView回调
         }
+        */
+        openCamera(dm.widthPixels, dm.heightPixels);
+        mCameraPreviewRenderer = new CameraPreviewRenderer();
+        mCameraPreviewRenderer.init(mGlSurfaceView,this,false,getContext().getApplicationContext());
+        mGlSurfaceView.setRenderer(mCameraPreviewRenderer);
     }
-
+    public void setPreviewTexture(SurfaceTexture surfaceTexture) {
+        mSurfaceTexture = surfaceTexture;
+    }
     @Override
     public void onPause() {
         closeCamera();
@@ -657,6 +676,7 @@ public class Camera2BasicFragment_GLSurfaceView extends Fragment
                         maxPreviewHeight, largest);//获取最优的预览分辨率
 
                 // We fit the aspect ratio of TextureView to the size of preview we picked.
+                /*
                 int orientation = getResources().getConfiguration().orientation;
                 if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
                     mTextureView.setAspectRatio(
@@ -665,7 +685,7 @@ public class Camera2BasicFragment_GLSurfaceView extends Fragment
                     mTextureView.setAspectRatio(
                             mPreviewSize.getHeight(), mPreviewSize.getWidth());
                 }
-
+                */
                 // Check if the flash is supported.
                 Boolean available = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE);
                 mFlashSupported = available == null ? false : available;
@@ -693,7 +713,7 @@ public class Camera2BasicFragment_GLSurfaceView extends Fragment
             return;
         }
         setUpCameraOutputs(width, height);
-        configureTransform(width, height);
+        //configureTransform(width, height);
         Activity activity = getActivity();
         CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
         try {
@@ -759,8 +779,9 @@ public class Camera2BasicFragment_GLSurfaceView extends Fragment
     /**
      * Creates a new {@link CameraCaptureSession} for camera preview.
      */
-    private void createCameraPreviewSession() {
+    public void createCameraPreviewSession() {
         try {
+            /*
             SurfaceTexture texture = mTextureView.getSurfaceTexture();//通过mTextureView获取SurfaceTexture。
             assert texture != null;
 
@@ -769,7 +790,9 @@ public class Camera2BasicFragment_GLSurfaceView extends Fragment
 
             // This is the output Surface we need to start preview.
             Surface surface = new Surface(texture);//通过SurfaceTexture创建Surface来预览。
-
+            */
+            mSurfaceTexture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
+            Surface surface = new Surface(mSurfaceTexture);
             // We set up a CaptureRequest.Builder with the output Surface.
             mPreviewRequestBuilder
                     = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);//创建TEMPLATE_PREVIEW预览CaptureRequest.Builder
@@ -809,7 +832,7 @@ public class Camera2BasicFragment_GLSurfaceView extends Fragment
                                 @NonNull CameraCaptureSession cameraCaptureSession) {
                             showToast("Failed");
                         }
-                    }, null
+                    }, mBackgroundHandler
             );
         } catch (CameraAccessException e) {
             e.printStackTrace();
@@ -824,6 +847,7 @@ public class Camera2BasicFragment_GLSurfaceView extends Fragment
      * @param viewWidth  The width of `mTextureView`
      * @param viewHeight The height of `mTextureView`
      */
+    /*
     private void configureTransform(int viewWidth, int viewHeight) {//配置transformation，主要是矩阵旋转相关
         Activity activity = getActivity();
         if (null == mTextureView || null == mPreviewSize || null == activity) {
@@ -848,7 +872,7 @@ public class Camera2BasicFragment_GLSurfaceView extends Fragment
         }
         mTextureView.setTransform(matrix);//设置mTextureView的transformation
     }
-
+*/
     /**
      * Initiate a still image capture.
      */
