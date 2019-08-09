@@ -38,6 +38,7 @@ import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
+import android.hardware.camera2.params.Face;//google人脸识别功能
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
@@ -180,6 +181,11 @@ public class Camera2BasicFragment extends Fragment
      * The {@link android.util.Size} of camera preview.
      */
     private Size mPreviewSize;
+
+    //google人脸识别功能添加
+	private Face[] faces;
+    int[] faceDetectModes;
+	//google人脸识别功能添加
 
     /**
      * {@link CameraDevice.StateCallback} is called when {@link CameraDevice} changes its state.
@@ -343,6 +349,7 @@ public class Camera2BasicFragment extends Fragment
         public void onCaptureCompleted(@NonNull CameraCaptureSession session,
                                        @NonNull CaptureRequest request,
                                        @NonNull TotalCaptureResult result) {
+            onCameraImagePreviewed(result);//Google人脸识别功能添加 by yangheng
             process(result);
         }
 
@@ -581,6 +588,15 @@ public class Camera2BasicFragment extends Fragment
 
                 // Check if the flash is supported.
                 Boolean available = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE);
+				//Google人脸识别功能添加 by yangheng Begin
+                //可用于判断是否支持人脸检测，以及支持到哪种程度
+                faceDetectModes = characteristics.get(CameraCharacteristics
+                        .STATISTICS_INFO_AVAILABLE_FACE_DETECT_MODES);//支持的人脸检测模式
+                int maxFaceCount = characteristics.get(CameraCharacteristics.STATISTICS_INFO_MAX_FACE_COUNT);
+                //支持的最大检测人脸数量
+
+                Log.i("yangheng", "faceDetectModes = " + faceDetectModes + ", maxFaceCount = " + maxFaceCount);
+				//Google人脸识别功能添加 by yangheng End
                 mFlashSupported = available == null ? false : available;
 
                 mCameraId = cameraId;
@@ -595,6 +611,21 @@ public class Camera2BasicFragment extends Fragment
                     .show(getChildFragmentManager(), FRAGMENT_DIALOG);
         }
     }
+
+    //Google人脸识别功能添加 by yangheng Begin
+	/**
+     * 获取支持的最高人脸检测级别
+     *
+     * @return
+     */
+    private int getFaceDetectMode() {
+        if (faceDetectModes == null) {
+            return CaptureRequest.STATISTICS_FACE_DETECT_MODE_FULL;
+        } else {
+            return faceDetectModes[faceDetectModes.length - 1];
+        }
+    }
+	//Google人脸识别功能添加 by yangheng End
 
     /**
      * Opens the camera specified by {@link Camera2BasicFragment#mCameraId}.
@@ -687,6 +718,10 @@ public class Camera2BasicFragment extends Fragment
             mPreviewRequestBuilder
                     = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             mPreviewRequestBuilder.addTarget(surface);
+			//Google人脸识别功能添加 by yangheng Begin
+            mPreviewRequestBuilder.set(CaptureRequest.STATISTICS_FACE_DETECT_MODE, getFaceDetectMode());//设置人脸检测级别
+            Log.i("yangheng" , "" + getFaceDetectMode());
+			//Google人脸识别功能添加 by yangheng End
 
             // Here, we create a CameraCaptureSession for camera preview.
             mCameraDevice.createCaptureSession(Arrays.asList(surface, mImageReader.getSurface()),
@@ -728,6 +763,22 @@ public class Camera2BasicFragment extends Fragment
             e.printStackTrace();
         }
     }
+
+    //Google人脸识别功能添加 by yangheng Begin
+	/**
+     * 处理相机画面处理完成事件，获取检测到的人脸坐标，换算并绘制方框
+     *
+     * @param result
+     */
+    private void onCameraImagePreviewed(CaptureResult result) {
+        Face faces[] = result.get(CaptureResult.STATISTICS_FACES);
+        Log.i("yangheng", "检测到有人脸，进行拍照操作：faceLength=" + faces.length);
+        if (faces.length > 0) {
+            //检测到有人脸，控制相机进行拍照操作
+//            executeCapture();
+        }
+    }
+	//Google人脸识别功能添加 by yangheng End
 
     /**
      * Configures the necessary {@link android.graphics.Matrix} transformation to `mTextureView`.
@@ -835,6 +886,7 @@ public class Camera2BasicFragment extends Fragment
                 public void onCaptureCompleted(@NonNull CameraCaptureSession session,
                                                @NonNull CaptureRequest request,
                                                @NonNull TotalCaptureResult result) {
+                    onCameraImagePreviewed(result);//Google人脸识别功能添加 by yangheng
                     showToast("Saved: " + mFile);
                     Log.d(TAG, mFile.toString());
                     unlockFocus();
