@@ -229,6 +229,9 @@ public class Camera2BasicFragment extends Fragment
      */
     private ImageReader mImageReader;
 
+    //虹软人脸识别 yangheng
+    private ImageReader previewImageReader;
+
     /**
      * This is the output file for our picture.
      */
@@ -247,6 +250,22 @@ public class Camera2BasicFragment extends Fragment
         }
 
     };
+
+    // 虹软人脸识别 yangheng add begin
+    private AFDFaceDetection afdFaceDetection = new AFDFaceDetection();;
+
+    private class OnPreviewImageAvailableListenerImpl implements ImageReader.OnImageAvailableListener {
+
+        @Override
+        public void onImageAvailable(ImageReader reader) {
+            Image image = reader.acquireNextImage();
+            byte[] datas;
+            datas = FormatChangeUtil.GetNV21DataFormImageSpeed(image);
+            afdFaceDetection.process(datas, image.getWidth(), image.getHeight());
+            image.close();
+        }
+    }
+    // 虹软人脸识别 yangheng add end
 
     /**
      * {@link CaptureRequest.Builder} for the camera preview
@@ -517,6 +536,12 @@ public class Camera2BasicFragment extends Fragment
                 mImageReader.setOnImageAvailableListener(
                         mOnImageAvailableListener, mBackgroundHandler);
 
+                // 虹软人脸识别 yangheng add begin
+                previewImageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
+                        ImageFormat.YUV_420_888, 2);
+                previewImageReader.setOnImageAvailableListener(
+                        new OnPreviewImageAvailableListenerImpl(), mBackgroundHandler);
+                // 虹软人脸识别 yangheng add end
                 // Find out if we need to swap dimension to get the preview size relative to sensor
                 // coordinate.
                 int displayRotation = activity.getWindowManager().getDefaultDisplay().getRotation();
@@ -639,6 +664,12 @@ public class Camera2BasicFragment extends Fragment
                 mImageReader.close();
                 mImageReader = null;
             }
+            // 虹软人脸识别 yangheng Begin
+            if (null != previewImageReader) {
+                previewImageReader.close();
+                previewImageReader = null;
+            }
+            // 虹软人脸识别 yangheng End
         } catch (InterruptedException e) {
             throw new RuntimeException("Interrupted while trying to lock camera closing.", e);
         } finally {
@@ -687,9 +718,10 @@ public class Camera2BasicFragment extends Fragment
             mPreviewRequestBuilder
                     = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
             mPreviewRequestBuilder.addTarget(surface);
+            mPreviewRequestBuilder.addTarget(previewImageReader.getSurface());// 虹软人脸识别 yangheng
 
             // Here, we create a CameraCaptureSession for camera preview.
-            mCameraDevice.createCaptureSession(Arrays.asList(surface, mImageReader.getSurface()),
+            mCameraDevice.createCaptureSession(Arrays.asList(surface, mImageReader.getSurface(), previewImageReader.getSurface()),// 虹软人脸识别 yangheng
                     new CameraCaptureSession.StateCallback() {
 
                         @Override
