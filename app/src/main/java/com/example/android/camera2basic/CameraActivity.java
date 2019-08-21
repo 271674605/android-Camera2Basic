@@ -449,6 +449,18 @@ Runnable 接口的类的实例。
 内部原理 = Thread类 + Handler类机制，即：
 通过继承Thread类，快速地创建1个带有Looper对象的新工作线程
 通过封装Handler类，快速创建Handler & 与其他线程进行通信
+5. 使用场景：
+为某些回调方法或者等待某些任务的执行设置一个专属的线程，并提供线程任务的调度机制。
+HandlerThrread 是一个无限循环，当我们不在使用HandlerThread的时候，我们通过quit或者quitSafely方法终止线程的执行。
+
+大多数情况下，AsyncTask 都能够满足多线程并发的场景需要（在工作线程执行任务并返回结果到主线程），但是它并不是万能的。例如打开相机之后的预览帧数据是通过 onPreviewFrame()的方法进行回调的，o
+nPreviewFrame()和 open()相机的方法是执行在同一个线程的。如果使用 AsyncTask，会因为 AsyncTask 默认的线性执行的特性(即使换成并发执行)会导致因为无法把任务及时传递给工作线程而导致任务在主线程中被延迟，
+直到工作线程空闲，才可以把任务切换到工作线程中进行执行。所以我们需要的是一个执行在工作线程，同时又能够处理队列中的复杂任务的功能，而 HandlerThread 的出现就是为了实现这个功能的，
+它组合了 Handler，MessageQueue，Looper 实现了一个长时间运行的线程，不断的从队列中获取任务进行执行的功能。
+
+注意事项：
+HandlerThread 比较合适处理那些在工作线程执行，需要花费时间偏长的任务。我们只需要把任务发送给 HandlerThread，然后就只需要等待任务执行结束的时候通知返回到主线程就好了。
+另外很重要的一点是，一旦我们使用了 HandlerThread，需要特别注意给 HandlerThread 设置不同的线程优先级，CPU 会根据设置的不同线程优先级对所有的线程进行调度优化。
  */
     public void CreatThreadByMethod6(){//6、HandlerThread方式开启线程
         mMainHandlerCallback = new Handler(getMainLooper());
@@ -517,6 +529,21 @@ Runnable 接口的类的实例。
         }
     };
     /////////////////////////////////////创建线程方式8：CreatThreadByMethod8///////////////////////////////////////////////////////////////////////
+    /*
+IntentService是一个特殊的service，继承service,是一个抽象类，，intentService可用来执行后台的耗时操作，任务执行后会自动停止，由于intentService是服务的缘故，优先级要比普通的线程要高。
+所以IntentService比较适合一些高优先级的后台任务，
+默认的 Service 是执行在主线程的，可是通常情况下，这很容易影响到程序的绘制性能(抢占了主线程的资源)。除了前面介绍过的 AsyncTask 与 HandlerThread，我们还可以选择使用 IntentService 来实现异步操作。
+IntentService 继承自普通 Service 同时又在内部创建了一个 HandlerThread，在 onHandlerIntent()的回调里面处理扔到 IntentService 的任务，在执行完任务后会自动停止。
+所以 IntentService 就不仅仅具备了异步线程的特性，还同时保留了 Service 不受主页面生命周期影响，优先级比较高，适合执行高优先级的后台任务,不容易被杀死的特点。
+使用场景：
+适合于执行由 UI 触发的后台 Service 任务，并可以把后台任务执行的情况通过一定的机制反馈给 UI。
+注意事项：
+使用 IntentService 需要特别留意以下几点：
+首先，因为 IntentService 内置的是 HandlerThread 作为异步线程，所以每一个交给 IntentService 的任务都将以队列的方式逐个被执行到，一旦队列中有某个任务执行时间过长，那么就会导致后续的任务都会被延迟处理。
+其次，通常使用到 IntentService 的时候，我们会结合使用 BroadcastReceiver 把工作线程的任务执行结果返回给主 UI 线程。使用广播容易引起性能问题，我们可以使用 LocalBroadcastManager 来发送只在程序内部传递的广播，
+从而提升广播的性能。我们也可以使用 runOnUiThread() 快速回调到主 UI 线程。
+最后，包含正在运行的 IntentService 的程序相比起纯粹的后台程序更不容易被系统杀死，该程序的优先级是介于前台程序与纯后台程序之间的。
+     */
     public void CreatThreadByMethod8(){//8、启用方式通过IntentService启动线程
         Intent intent = new Intent(this, MyIntentService.class);
         Bundle bundle = new Bundle();
@@ -617,6 +644,37 @@ Runnable 接口的类的实例。
         mMainHandler.sendEmptyMessage(1);
     }
     /////////////////////////////////////创建线程方式11：CreatThreadByMethod11:AsyncTask开启线程///////////////////////////////////////////////////////////////////////
+    /*
+    asyncTask: 封装了线程池和Handler,主要方便开发者在子线程中更新UI;是一种轻量级的异步任务类，
+    在线程池中执行后台任务，然后把执行的进度和最终结果传递给主线程中更新UI,
+AsyncTask封装了Thread和Handler，但是AsyncTask并不适合特别耗时的后台任务，对于特别耗时AsyncTask做耗时操作不足之处：
+1）存在大量消耗系统资源和导致应用FC风险(软件崩溃，出现问题)
+2）AsyncTask一旦执行doInBackground，就算调用取消，也会将代码执行完毕才会停止；
+3）线程池不经维护，当大量异步发生时，导致线程池满了会出异常。
+ ————————————————
+AsyncTask使用过程中有一些条件限制。
+1）AsyncTask的类必须在主线程中加载，这就意味着第一次访问AsyncTask必须发生在主线程；
+2）AsyncTask的对象必须在主线程中创建；
+3)execute方法必须在UI线程调用
+4）不要在程序中直接调用 onPreExecute()，onPostExecute,doInBackground和onProGressUpdate方法；
+5）一个AsyncTask对象只能执行一次，即只能调用一次execute方法，
+ ————————————————
+大多数情况下，AsyncTask 都能够满足多线程并发的场景需要（在工作线程执行任务并返回结果到主线程），但是它并不是万能的。例如打开相机之后的预览帧数据是通过 onPreviewFrame()的方法进行回调的，o
+nPreviewFrame()和 open()相机的方法是执行在同一个线程的。如果使用 AsyncTask，会因为 AsyncTask 默认的线性执行的特性(即使换成并发执行)会导致因为无法把任务及时传递给工作线程而导致任务在主线程中被延迟，
+直到工作线程空闲，才可以把任务切换到工作线程中进行执行。所以我们需要的是一个执行在工作线程，同时又能够处理队列中的复杂任务的功能，而 HandlerThread 的出现就是为了实现这个功能的，
+它组合了 Handler，MessageQueue，Looper 实现了一个长时间运行的线程，不断的从队列中获取任务进行执行的功能。
+使用场景：
+为 UI 线程与工作线程之间进行快速的切换提供一种简单便捷的机制。适用于当下立即需要启动，但是异步执行的生命周期短暂的使用场景。
+注意事项：
+
+首先，默认情况下，所有的 AsyncTask 任务都是被线性调度执行的，他们处在同一个任务队列当中，按顺序逐个执行。假设你按照顺序启动20个 AsyncTask，一旦其中的某个 AsyncTask 执行时间过长，队列中的其他剩余
+AsyncTask 都处于阻塞状态，必须等到该任务执行完毕之后才能够有机会执行下一个任务。为了解决上面提到的线性队列等待的问题，我们可以使用 AsyncTask.executeOnExecutor()强制指定 AsyncTask 使用线程池并发调度任务。
+其次，如何才能够真正的取消一个 AsyncTask 的执行呢？我们知道 AsyncTaks 有提供 cancel()的方法，但是这个方法实际上做了什么事情呢？线程本身并不具备中止正在执行的代码的能力，为了能够让一个线程更早的被销毁，
+我们需要在 doInBackground()的代码中不断的添加程序是否被中止的判断逻辑。一旦任务被成功中止，AsyncTask 就不会继续调用 onPostExecute()，而是通过调用 onCancelled()的回调方法反馈任务执行取消的结果。
+我们可以根据任务回调到哪个方法（是 onPostExecute 还是 onCancelled）来决定是对 UI 进行正常的更新还是把对应的任务所占用的内存进行销毁等。
+最后，使用 AsyncTask 很容易导致内存泄漏，一旦把 AsyncTask 写成 Activity 的内部类的形式就很容易因为 AsyncTask 生命周期的不确定而导致 Activity 发生泄漏。
+综上所述，AsyncTask 虽然提供了一种简单便捷的异步机制，但是我们还是很有必要特别关注到他的缺点，避免出现因为使用错误而导致的严重系统性能问题。
+     */
     public void CreatThreadByMethod11(){//AsyncTask开启线程
         StartAsync();
     }
@@ -624,14 +682,14 @@ Runnable 接口的类的实例。
         new AsyncTask<Object, Object, Object>() {
             @Override
             protected void onPreExecute() {
-                //首先执行这个方法，它在UI线程中 可以执行一些异步操作
+                //首先执行这个方法，它在UI线程中 可以执行一些异步操作，在主线程中执行了，在异步任务执行之前，此方法被调用，做一些准备工作；
                 Log.i(TAG, "AsyncTask 开始加载进度！");
                 super.onPreExecute();
             }
 
             @Override
             protected Object doInBackground(Object... arg0) {
-                //异步后台执行 ，执行完毕可以返回出去一个结果object对象
+                //在线程池中执行，此方法用于执行异步任务，异步后台执行 ，执行完毕可以返回出去一个结果object对象
                 Long startTime = System.currentTimeMillis(); //得到开始加载的时间
                 for (int i = 0; i < 100; i++) {
                     publishProgress(i);//执行这个方法会异步调用onProgressUpdate方法，可以用来更新UI
@@ -641,12 +699,12 @@ Runnable 接口的类的实例。
             }
             @Override
             protected void onPostExecute(Object result) {
-                //doInBackground之行结束以后在这里可以接收到返回的结果对象
+                //doInBackground之行结束以后在这里可以接收到返回的结果对象。在主线程中执行，异步任务执行之后，此方法会被调用，
                 super.onPostExecute(result);
             }
             @Override
             protected void onProgressUpdate(Object... values) {
-                //时时拿到当前的进度更新UI
+                //时时拿到当前的进度更新UI。在主线程中执行，当后台任务执行进度发生改变时此方法会被调用；
                 Log.i(TAG, "AsyncTask 当前加载进度！");
                 super.onProgressUpdate(values);
             }
@@ -1701,6 +1759,29 @@ Handler mainHandler = new Handler(Looper.getMainLooper())，来获取主线程�
         });
     }
  /////////////////////////////////////startService开启后台服务///////////////////////////////////////////////////////////////////////
+    /*
+Service通常都在后台运行，在按下按钮时拉取/处理任务的例子中，也可以在按下按钮时启动一个Service，让它来拉取/处理数据，然后结束运行。这种方法的问题是运行效率太低，使用AsyncTask更合适。
+当你需要在后台一直做一件事，如播放音乐，轮询检查新数据等，这种场景使用Service更合适。
+Service运行在主线程，使用时不能处理耗时任务。可以在内部使用thread来完成耗时任务。Service还可以使用process属性将其运行在不同的线程中，提高进程的保活性。
+
+A.其实大家不要把后台和子线程联系在一起就行了，这是两个完全不同的概念。
+Android的后台就是指，它的运行是完全不依赖UI的。即使Activity被销毁，或者程序被关闭，只要进程还在，Service就可以继续运行。比如说一些应用程序，始终需要与服务器之间始终保持着心跳连接，就可以使用Service来实现。
+你可能又会问，前面不是刚刚验证过Service是运行在主线程里的么？在这里一直执行着心跳连接，难道就不会阻塞主线程的运行吗？当然会，但是我们可以在Service中再创建一个子线程，然后在这里去处理耗时逻辑就没问题了。
+
+B.既然在Service里也要创建一个子线程，那为什么不直接在Activity里创建呢？为什么不在Activity里创建子线程？
+1.这是因为Activity很难对Thread进行控制，当Activity被销毁之后，就没有任何其它的办法可以再重新获取到之前创建的子线程的实例。
+2.而且在一个Activity中创建的子线程，另一个Activity无法对其进行操作。
+3.但是Service就不同了，所有的Activity都可以与Service进行关联，然后可以很方便地操作其中的方法，即使Activity被销毁了，之后只要重新与Service建立关联，就又能够获取到原有的Service中Binder的实例。
+因此，使用Service来处理后台任务，Activity就可以放心地finish，完全不需要担心无法对后台任务进行控制的情况。
+
+Service 与 Thread 的区别
+很多时候，你可能会问，为什么要用 Service，而不用 Thread 呢，因为用 Thread 是很方便的，比起 Service 也方便多了，下面我详细的来解释一下。
+Thread：Thread 是程序执行的最小单元，它是分配CPU的基本单位。可以用 Thread 来执行一些异步的操作。
+Service：Service 是android的一种机制，当它运行的时候如果是Local Service，那么对应的 Service 是运行在主进程的 main 线程上的。如：onCreate，onStart 这些函数在被系统调用的时候都是在主进程的 main 线程上运行的。
+如果是Remote Service，那么对应的 Service 则是运行在独立进程的 main 线程上。因此请不要把 Service 理解成线程，它跟线程半毛钱的关系都没有！
+因此你可以把 Service 想象成一种消息服务，而你可以在任何有 Context 的地方调用 Context.startService、Context.stopService、Context.bindService，Context.unbindService，来控制它，
+你也可以在 Service 里注册 BroadcastReceiver，在其他地方通过发送 broadcast 来控制它，当然这些都是 Thread 做不到的。
+     */
     public void teststartService(){
         // 设置当前布局视图
         setContentView(R.layout.myservice);
