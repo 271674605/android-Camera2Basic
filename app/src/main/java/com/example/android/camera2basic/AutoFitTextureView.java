@@ -44,7 +44,7 @@ public class AutoFitTextureView extends TextureView {
      * Sets the aspect ratio for this view. The size of the view will be measured based on the ratio
      * calculated from the parameters. Note that the actual sizes of parameters don't matter, that
      * is, calling setAspectRatio(2, 3) and setAspectRatio(4, 6) make the same result.
-     *
+     * 设置此视图的宽高比。视图的大小将根据比率进行测量根据参数计算。注意，参数的实际大小并不重要，调用setAspectRatio(2,3)和setAspectRatio(4,6)得到相同的结果。
      * @param width  Relative horizontal size
      * @param height Relative vertical size
      */
@@ -64,7 +64,7 @@ public class AutoFitTextureView extends TextureView {
         int height = MeasureSpec.getSize(heightMeasureSpec);
         if (0 == mRatioWidth || 0 == mRatioHeight) {
             setMeasuredDimension(width, height);
-        } else {
+        } else { //设置UI控件最终的分辨率
             if (width < height * mRatioWidth / mRatioHeight) {
                 setMeasuredDimension(width, width * mRatioHeight / mRatioWidth);
             } else {

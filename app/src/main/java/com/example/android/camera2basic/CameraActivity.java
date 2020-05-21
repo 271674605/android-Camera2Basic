@@ -57,7 +57,7 @@ import java.util.concurrent.TimeUnit;
 import android.os.Handler;
 import android.os.HandlerThread;
 public class CameraActivity extends AppCompatActivity {
-    public int switchFunc = 4;
+    public int switchFunc = 2;
     public String TAG = "bruce";
     // 声明Button
     /**Timer对象**/
@@ -673,7 +673,14 @@ AsyncTask 都处于阻塞状态，必须等到该任务执行完毕之后才能�
 我们需要在 doInBackground()的代码中不断的添加程序是否被中止的判断逻辑。一旦任务被成功中止，AsyncTask 就不会继续调用 onPostExecute()，而是通过调用 onCancelled()的回调方法反馈任务执行取消的结果。
 我们可以根据任务回调到哪个方法（是 onPostExecute 还是 onCancelled）来决定是对 UI 进行正常的更新还是把对应的任务所占用的内存进行销毁等。
 最后，使用 AsyncTask 很容易导致内存泄漏，一旦把 AsyncTask 写成 Activity 的内部类的形式就很容易因为 AsyncTask 生命周期的不确定而导致 Activity 发生泄漏。
-综上所述，AsyncTask 虽然提供了一种简单便捷的异步机制，但是我们还是很有必要特别关注到他的缺点，避免出现因为使用错误而导致的严重系统性能问题。
+综上所述，AsyncTask 虽然提供了一种简单便捷的异步机制，但是我们还是很有必要特别关注到他的缺点，避免出现因为使用错误而导致的严重系统性能问题。AsyncTask使用须知
+
+AsyncTask默认是串行执行，若要并发执行则要调用executeOnExecutor(Executor exec, Params... params)方法指定线程池执行，也可以通过setDefaultExecutor(Executor exec)设置默认线程池
+AsyncTask作为内部类的时候最好声明为静态内部类，并以弱引用的形式引用Activity，防止内存泄漏
+AsyncTask中的后台任务应该使用isCancelled()判断任务是否已经取消，防止做无用功，
+任务中有一个循环，可以在循环条件中加入判断
+Activity销毁的时候最好调用AsyncTask的cancel()方法,防止更新已经被回收的view
+Activity重建时候应注意对AsyncTask的维护
      */
     public void CreatThreadByMethod11(){//AsyncTask开启线程
         StartAsync();

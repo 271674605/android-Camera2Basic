@@ -77,6 +77,16 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 /* 拍照预览流程图
+UI控件分辨率：protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+预览分辨率：SurfaceHolder.setFixedSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
+图片分辨率：mImageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),ImageFormat.JPEG, 2);
+
+SurfaceView设置预览方向：camera2无法设置？
+图片方向：captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getOrientation(rotation));
+
+屏幕旋转：
+
+
 1-> public void onViewCreated(final View view, Bundle savedInstanceState) {
   2-> mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);//获取mTextureView 
 1-> public void onResume() {
