@@ -285,7 +285,7 @@ public class Camera2BasicFragment_SurfaveView extends Fragment
      * An {@link AutoFitTextureView} for camera preview.
      */
     //private AutoFitTextureView mTextureView;
-    private SurfaceView mSurfaceView;
+    private AutoFitSurfaceView mSurfaceView;
     private SurfaceHolder mSurfaceHolder;
     /**
      * A {@link CameraCaptureSession } for camera preview.
@@ -550,7 +550,7 @@ public class Camera2BasicFragment_SurfaveView extends Fragment
         view.findViewById(R.id.picture).setOnClickListener(this);
         view.findViewById(R.id.info).setOnClickListener(this);
         //mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);//获取mTextureView
-        mSurfaceView = (SurfaceView)view.findViewById(R.id.surfaceview);
+        mSurfaceView = (AutoFitSurfaceView)view.findViewById(R.id.surfaceview);
     }
 
     @Override
@@ -698,16 +698,14 @@ public class Camera2BasicFragment_SurfaveView extends Fragment
                         maxPreviewHeight, largest);//获取最优的预览分辨率
 
                 // We fit the aspect ratio of TextureView to the size of preview we picked.
-                /*
                 int orientation = getResources().getConfiguration().orientation;
                 if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                    mTextureView.setAspectRatio(
-                            mPreviewSize.getWidth(), mPreviewSize.getHeight());;//设置TextureView预览分辨率。
+                    mSurfaceView.setAspectRatio(
+                            mPreviewSize.getWidth(), mPreviewSize.getHeight());;//设置SurfaceView预览分辨率。
                 } else {
-                    mTextureView.setAspectRatio(
+                    mSurfaceView.setAspectRatio(
                             mPreviewSize.getHeight(), mPreviewSize.getWidth());
                 }
-                */
                 // Check if the flash is supported.
                 Boolean available = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE);
                 mFlashSupported = available == null ? false : available;
@@ -813,6 +811,16 @@ public class Camera2BasicFragment_SurfaveView extends Fragment
             // This is the output Surface we need to start preview.
             Surface surface = new Surface(texture);//通过SurfaceTexture创建Surface来预览。
             */
+            final Activity activity = getActivity();
+            if (activity != null) {
+                activity.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Log.d("mPreviewSize=","mPreviewSize=" + mPreviewSize);
+                        mSurfaceHolder.setFixedSize(mPreviewSize.getWidth(),mPreviewSize.getHeight());
+                    }
+                });
+            }
             Surface surface = mSurfaceHolder.getSurface();
             // We set up a CaptureRequest.Builder with the output Surface.
             mPreviewRequestBuilder
