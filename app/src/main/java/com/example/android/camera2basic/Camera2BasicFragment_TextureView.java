@@ -171,7 +171,7 @@ public class Camera2BasicFragment_TextureView extends Fragment
         implements View.OnClickListener, ActivityCompat.OnRequestPermissionsResultCallback {
 
     /**
-     * Conversion from screen rotation to JPEG orientation.
+     * Conversion from screen rotation to JPEG orientation.根据屏幕方向转换JPEG图片方向
      */
     private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
     private static final int REQUEST_CAMERA_PERMISSION = 1;
@@ -237,8 +237,8 @@ public class Camera2BasicFragment_TextureView extends Fragment
         }
 
         @Override
-        public void onSurfaceTextureSizeChanged(SurfaceTexture texture, int width, int height) {
-            configureTransform(width, height);// 当屏幕旋转时，预览方向改变时, 执行转换操作. 默认情况下TextureView通过此方法设置预览方向
+        public void onSurfaceTextureSizeChanged(SurfaceTexture texture, int width, int height) {//屏幕旋转时，摄像头/HAL捕捉到的原始图像也会跟着旋转，因此软件层面无需旋转。
+            configureTransform(width, height);// 当屏幕旋转时，不会回调此方法。只有当size改变时, 才回调执行转换操作，屏幕旋转size并没有改变.
         }
 
         @Override
@@ -613,12 +613,13 @@ public class Camera2BasicFragment_TextureView extends Fragment
                         new CompareSizesByArea());
                 mImageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
                         ImageFormat.JPEG, /*maxImages*/2);//设置ImageReader接收的图片格式，以及允许接收的最大图片数目
+                Log.e(TAG, "JPEG size: " + largest.getWidth() + "*" + largest.getHeight());
                 mImageReader.setOnImageAvailableListener(
                         mOnImageAvailableListener, mBackgroundHandler);//设置图片存储的监听，但在创建会话，调用capture后才能有数据
 
                 // Find out if we need to swap dimension to get the preview size relative to sensor
                 // coordinate.看看我们是否需要交换尺寸，以获得相对于传感器坐标的预览大小。
-                int displayRotation = activity.getWindowManager().getDefaultDisplay().getRotation();//获取屏幕显示方向
+                int displayRotation = activity.getWindowManager().getDefaultDisplay().getRotation();//获取屏幕显示自然方向，屏幕旋转时依然是固定值。屏幕旋转需通过onOrientationChanged来监听。
                 //noinspection ConstantConditions
                 mSensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);//获取sensor方向
                 boolean swappedDimensions = false;//交换尺寸
@@ -705,7 +706,7 @@ public class Camera2BasicFragment_TextureView extends Fragment
             return;
         }
         setUpCameraOutputs(width, height);
-        configureTransform(width, height);//TextureView通过此方法设置预览方向
+        configureTransform(width, height);//openCamera时TextureView通过此方法设置默认预览方向
         Activity activity = getActivity();
         CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
         try {
@@ -778,7 +779,7 @@ public class Camera2BasicFragment_TextureView extends Fragment
 
             // We configure the size of default buffer to be the size of camera preview we want.我们将默认缓冲区的大小配置为我们想要的相机预览的大小
             texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());//设置SurfaceTexture大小
-
+            Log.e(TAG, "preview size: " + mPreviewSize.getWidth() + "*" + mPreviewSize.getHeight());
             // This is the output Surface we need to start preview.
             Surface surface = new Surface(texture);//通过SurfaceTexture创建Surface来预览。
 
@@ -855,8 +856,13 @@ public class Camera2BasicFragment_TextureView extends Fragment
                     (float) viewWidth / mPreviewSize.getWidth());
             matrix.postScale(scale, scale, centerX, centerY);
             matrix.postRotate(90 * (rotation - 2), centerX, centerY);
+            //Log.e(TAG, "preview orientation: " + rotation);
         } else if (Surface.ROTATION_180 == rotation) {
             matrix.postRotate(180, centerX, centerY);
+            //Log.e(TAG, "preview orientation: " + rotation);
+        } else if (Surface.ROTATION_0 == rotation) {
+            Log.e(TAG, "preview orientation: " + rotation);
+            //matrix.postRotate(180, centerX, centerY);//rotation默认为0，不处理，如果注释打开，则预览方向被旋转了180度。
         }
         mTextureView.setTransform(matrix);//设置mTextureView的transformation
     }
@@ -924,8 +930,8 @@ public class Camera2BasicFragment_TextureView extends Fragment
             setAutoFlash(captureBuilder);
 
             // Orientation
-            int rotation = activity.getWindowManager().getDefaultDisplay().getRotation();
-            captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getOrientation(rotation));//设置图片方向
+            int rotation = activity.getWindowManager().getDefaultDisplay().getRotation();//获取屏幕显示自然方向，屏幕旋转时依然是固定值。屏幕旋转需通过onOrientationChanged来监听。
+            captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, getOrientation(rotation));//设置图片方向，默认竖屏rotation=0。如果改成180，拍成照片则倒置旋转180度。
 
             CameraCaptureSession.CaptureCallback CaptureCallback
                     = new CameraCaptureSession.CaptureCallback() {//拍照流程执行完成回调
@@ -949,7 +955,7 @@ public class Camera2BasicFragment_TextureView extends Fragment
     }
 
     /**
-     * Retrieves the JPEG orientation from the specified screen rotation.
+     * Retrieves the JPEG orientation from the specified screen rotation.根据屏幕固定自然方向转换成JPEG图片方向。
      *
      * @param rotation The screen rotation.
      * @return The JPEG orientation (one of 0, 90, 270, and 360)
@@ -959,7 +965,9 @@ public class Camera2BasicFragment_TextureView extends Fragment
         // We have to take that into account and rotate JPEG properly.
         // For devices with orientation of 90, we simply return our mapping from ORIENTATIONS.
         // For devices with orientation of 270, we need to rotate the JPEG 180 degrees.
-        return (ORIENTATIONS.get(rotation) + mSensorOrientation + 270) % 360;
+        int picRotation = (ORIENTATIONS.get(rotation) + mSensorOrientation + 270) % 360;
+        Log.e(TAG, "JPEG orientation: " + picRotation + "; screen自然orientation: " + rotation);
+        return picRotation;
     }
 
     /**

@@ -23,6 +23,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.hardware.SensorManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
@@ -33,6 +34,7 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.OrientationEventListener;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -57,8 +59,9 @@ import java.util.concurrent.TimeUnit;
 import android.os.Handler;
 import android.os.HandlerThread;
 public class CameraActivity extends AppCompatActivity {
-    public int switchFunc = 3;
+    public int switchFunc = 2;
     public String TAG = "bruce";
+    private int mOrientation = 0;
     // 声明Button
     /**Timer对象**/
     Timer mTimer = null;
@@ -72,6 +75,7 @@ public class CameraActivity extends AppCompatActivity {
     private static final int RECV_EXPRESSION = 4;
     Handler mMainHandlerCallback;
     Handler mBruceHandlerThreadSub;
+    private CameraOrientationListener orientationListener;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -118,6 +122,11 @@ public class CameraActivity extends AppCompatActivity {
             testMemoryLeakAll();//测试内存泄露
             printThreadInProcess();//打印当前进程的所有线程信息
         }
+
+        orientationListener = new CameraOrientationListener(this);
+        orientationListener.enable();
+
+        startOrientationChangeListener();
     }
 
     @Override
@@ -1876,6 +1885,72 @@ Service：Service 是android的一种机制，当它运行的时候如果是Loca
             unbindService(conn);
         }
     };
+    /**
+     * 启动屏幕朝向改变监听函数 用于在屏幕横竖屏切换时改变保存的图片的方向
+     */
+    private void startOrientationChangeListener() {
+        OrientationEventListener mOrEventListener = new OrientationEventListener(this) {
+            @Override
+            public void onOrientationChanged(int rotation) {
+                Log.i(TAG, "当前屏幕手持角度方法:" + rotation + "°");
+                if (((rotation >= 0) && (rotation <= 45)) || (rotation > 315)) {
+                    rotation = 0;
+                } else if ((rotation > 45) && (rotation <= 135)) {
+                    rotation = 90;
+                } else if ((rotation > 135) && (rotation <= 225)) {
+                    rotation = 180;
+                } else if ((rotation > 225) && (rotation <= 315)) {
+                    rotation = 270;
+                } else {
+                    rotation = 0;
+                }
+                if (rotation == mOrientation) {
+                    return;
+                }
+                mOrientation = rotation;
+            }
+        };
+        mOrEventListener.enable();
+    }
+
+    /**
+     * 当方向改变时，将调用侦听器onOrientationChanged(int)
+     */
+    private class CameraOrientationListener extends OrientationEventListener {
+
+        private int mCurrentNormalizedOrientation;
+        public String TAG = "bruce";
+        public CameraOrientationListener(Context context) {
+            super(context, SensorManager.SENSOR_DELAY_NORMAL);
+        }
+
+        @Override
+        public void onOrientationChanged(final int orientation) {
+            //Log.e(TAG, "当前屏幕手持角度:" + orientation + "°");
+            if (orientation != ORIENTATION_UNKNOWN) {
+                mCurrentNormalizedOrientation = normalize(orientation);
+            }
+
+            String str = "当前屏幕手持角度:" + orientation + "; 当前屏幕手持方向:" + mCurrentNormalizedOrientation;
+            Log.e(TAG, str);
+        }
+
+        private int normalize(int degrees) {
+            if (degrees > 315 || degrees <= 45) {
+                return 0;
+            }
+            if (degrees > 45 && degrees <= 135) {
+                return 90;
+            }
+            if (degrees > 135 && degrees <= 225) {
+                return 180;
+            }
+            if (degrees > 225 && degrees <= 315) {
+                return 270;
+            }
+            throw new RuntimeException("The physics as we know them are no more. Watch out for anomalies.");
+        }
+    }
 }
 class Constants {
     public static int SUB1_2_MAIN = 0;
