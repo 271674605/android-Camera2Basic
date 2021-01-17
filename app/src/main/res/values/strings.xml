@@ -63,4 +63,5 @@
     <string name="test_str2">从资源文件引用！</string>
     <string name="test_dimen">测试尺寸资源</string>
     <string name="test_dimen1">Test Dimension</string>
+    <string name="count_down_title_text">Counting down to take a photo</string>
 </resources>

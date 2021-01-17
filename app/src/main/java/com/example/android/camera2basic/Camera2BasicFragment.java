@@ -72,7 +72,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 public class Camera2BasicFragment extends Fragment
-        implements View.OnClickListener, ActivityCompat.OnRequestPermissionsResultCallback {
+        implements CountDownView.OnCountDownFinishedListener, View.OnClickListener, ActivityCompat.OnRequestPermissionsResultCallback {
 
     /**
      * Conversion from screen rotation to JPEG orientation.
@@ -80,7 +80,8 @@ public class Camera2BasicFragment extends Fragment
     private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
     private static final int REQUEST_CAMERA_PERMISSION = 1;
     private static final String FRAGMENT_DIALOG = "dialog";
-
+    private CountDownView mCountDownView;
+    private View mRootView;
     static {
         ORIENTATIONS.append(Surface.ROTATION_0, 90);
         ORIENTATIONS.append(Surface.ROTATION_90, 0);
@@ -423,12 +424,61 @@ public class Camera2BasicFragment extends Fragment
                              Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_camera2_basic, container, false);
     }
+    private void initializeCountDown() {
+//        返回View:   Activity.getWindow().getDecorView()
+//        返回ViewGroup:   (ViewGroup)Activity.getWindow().getDecorView()
+//        LayoutInflater(布局服务) https://www.runoob.com/w3cnote/android-tutorial-layoutinflater.html
+//         this.getActivity().getWindow().get
+        //LayoutInflater inflater = getLayoutInflater();
+        mRootView = (ViewGroup)this.getActivity().getWindow().getDecorView();//获取ViewGroup
+        this.getActivity().getLayoutInflater().inflate(R.layout.count_down_to_capture,
+                (ViewGroup) mRootView, true);//加载布局
+        mCountDownView = (CountDownView) (mRootView.findViewById(R.id.count_down_to_capture));//通过id获取CountDownView
+        mCountDownView.setCountDownFinishedListener((CountDownView.OnCountDownFinishedListener) this);
+        mCountDownView.bringToFront();
+        //mCountDownView.setOrientation(mOrientation);
+    }
 
+
+    public boolean isCountingDown() {
+        return mCountDownView != null && mCountDownView.isCountingDown();
+    }
+
+    public void cancelCountDown() {
+        if (mCountDownView == null) return;
+        mCountDownView.cancelCountDown();
+        //showUIAfterCountDown();
+    }
+
+    public void initCountDownView() {
+        if (mCountDownView == null) {
+            initializeCountDown();
+        } else {
+            mCountDownView.initSoundPool();
+        }
+    }
+
+    public void releaseSoundPool() {
+        if (mCountDownView != null) {
+            mCountDownView.releaseSoundPool();
+        }
+    }
+
+    public void startCountDown(int sec, boolean playSound) {
+        mCountDownView.startCountDown(sec, playSound);
+        //hideUIWhileCountDown();
+    }
+
+    @Override
+    public void onCountDownFinished() {
+
+    }
     @Override
     public void onViewCreated(final View view, Bundle savedInstanceState) {
         view.findViewById(R.id.picture).setOnClickListener(this);
         view.findViewById(R.id.info).setOnClickListener(this);
         mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);
+        initCountDownView();
     }
 
     @Override
@@ -442,6 +492,7 @@ public class Camera2BasicFragment extends Fragment
         super.onResume();
         startBackgroundThread();
 
+        startCountDown(5, true);
         // When the screen is turned off and turned back on, the SurfaceTexture is already
         // available, and "onSurfaceTextureAvailable" will not be called. In that case, we can open
         // a camera and start preview from here (otherwise, we wait until the surface is ready in

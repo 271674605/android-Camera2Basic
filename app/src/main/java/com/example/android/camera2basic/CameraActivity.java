@@ -29,6 +29,7 @@ import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.Toast;
 import java.util.Timer;
@@ -46,7 +47,8 @@ public class CameraActivity extends AppCompatActivity {
     /**记录TimerID**/
     int mTimerID = 0;
     private Button startBtn,stopBtn,bindBtn,unbindBtn;
-
+    private CountDownView mCountDownView;
+    private View mRootView;
     private static final int EXPRESSION = 2;
     private static final int RECV_EXPRESSION = 4;
     Handler mMainHandlerCallback;
@@ -54,7 +56,8 @@ public class CameraActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
+//        View rootLayout = getLayoutInflater().inflate(R.layout.fragment_camera2_basic, null, false);
+//        mRootView = rootLayout.findViewById(R.id.fragment_container);
         if(switchFunc == 0) {//camera2basic默认功能
             setContentView(R.layout.activity_camera);
             if (null == savedInstanceState) {
@@ -67,11 +70,16 @@ public class CameraActivity extends AppCompatActivity {
         }else if(switchFunc == 1){
             teststartService();
         }
+
+//        View rootLayout = getLayoutInflater().inflate(R.layout.fragment_camera2_basic, null, false);
+//        mRootView = rootLayout.findViewById(R.id.fragment_container);
+
     }
 
     @Override
     protected void onStart() {
         super.onStart();
+        //initCountDownView();
         Log.i(TAG, "onStart------------------------------>");
     }
 
@@ -84,7 +92,48 @@ public class CameraActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        //startCountDown(5, true);
         Log.i(TAG, "onResume------------------------------>");
+    }
+
+    private void initializeCountDown() {
+        mRootView = (ViewGroup)this.getWindow().getDecorView();//获取ViewGroup
+        this.getLayoutInflater().inflate(R.layout.count_down_to_capture,
+                (ViewGroup) mRootView, true);
+        mCountDownView = (CountDownView) (mRootView.findViewById(R.id.count_down_to_capture));
+        //mCountDownView.setCountDownFinishedListener((CountDownView.OnCountDownFinishedListener) mModule);
+        mCountDownView.bringToFront();
+        //mCountDownView.setOrientation(mOrientation);
+    }
+
+
+    public boolean isCountingDown() {
+        return mCountDownView != null && mCountDownView.isCountingDown();
+    }
+
+    public void cancelCountDown() {
+        if (mCountDownView == null) return;
+        mCountDownView.cancelCountDown();
+        //showUIAfterCountDown();
+    }
+
+    public void initCountDownView() {
+        if (mCountDownView == null) {
+            initializeCountDown();
+        } else {
+            mCountDownView.initSoundPool();
+        }
+    }
+
+    public void releaseSoundPool() {
+        if (mCountDownView != null) {
+            mCountDownView.releaseSoundPool();
+        }
+    }
+
+    public void startCountDown(int sec, boolean playSound) {
+        mCountDownView.startCountDown(sec, playSound);
+        //hideUIWhileCountDown();
     }
 
     @Override
