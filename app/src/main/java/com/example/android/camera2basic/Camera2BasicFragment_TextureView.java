@@ -168,7 +168,7 @@ TextureView设置预览方向：mTextureView.setTransform(matrix); 其他预览�
 
 */
 public class Camera2BasicFragment_TextureView extends Fragment
-        implements View.OnClickListener, ActivityCompat.OnRequestPermissionsResultCallback {
+        implements View.OnClickListener,CountDownView.OnCountDownFinishedListener, ActivityCompat.OnRequestPermissionsResultCallback {
 
     /**
      * Conversion from screen rotation to JPEG orientation.根据屏幕方向转换JPEG图片方向
@@ -176,7 +176,8 @@ public class Camera2BasicFragment_TextureView extends Fragment
     private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
     private static final int REQUEST_CAMERA_PERMISSION = 1;
     private static final String FRAGMENT_DIALOG = "dialog";
-
+    private CountDownView mCountDownView;
+    private View mRootView;
     static {
         ORIENTATIONS.append(Surface.ROTATION_0, 90);
         ORIENTATIONS.append(Surface.ROTATION_90, 0);
@@ -528,19 +529,63 @@ public class Camera2BasicFragment_TextureView extends Fragment
         view.findViewById(R.id.picture).setOnClickListener(this);
         view.findViewById(R.id.info).setOnClickListener(this);
         mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);//获取mTextureView
+        initCountDownView();
     }
 
     @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
+    public void onActivityCreated(Bundle savedInstanceState) {//当Fragment所在的Activity被启动完成后回调该方法。
         super.onActivityCreated(savedInstanceState);
         mFile = new File(getActivity().getExternalFilesDir(null), "pic.jpg");
     }
 
+    private void initializeCountDown() {
+        mRootView = (ViewGroup)this.getActivity().getWindow().getDecorView();
+        this.getActivity().getLayoutInflater().inflate(R.layout.count_down_to_capture,
+                (ViewGroup) mRootView, true);
+        mCountDownView = (CountDownView) (mRootView.findViewById(R.id.count_down_to_capture));
+        mCountDownView.setCountDownFinishedListener((CountDownView.OnCountDownFinishedListener) this);
+        mCountDownView.bringToFront();
+//        mCountDownView.setOrientation(mOrientation);
+    }
+
+    public boolean isCountingDown() {
+        return mCountDownView != null && mCountDownView.isCountingDown();
+    }
+
+    public void cancelCountDown() {
+        if (mCountDownView == null) return;
+        mCountDownView.cancelCountDown();
+//        showUIAfterCountDown();
+    }
+
+    public void initCountDownView() {
+        if (mCountDownView == null) {
+            initializeCountDown();
+        } else {
+            mCountDownView.initSoundPool();
+        }
+    }
+
+    public void releaseSoundPool() {
+        if (mCountDownView != null) {
+            mCountDownView.releaseSoundPool();
+        }
+    }
+
+    public void startCountDown(int sec, boolean playSound) {
+        mCountDownView.startCountDown(sec, playSound);
+//        hideUIWhileCountDown();
+    }
+    @Override
+    public void onCountDownFinished() {
+//            checkSelfieFlashAndTakePicture();
+//            mUI.showUIAfterCountDown();
+    }
     @Override
     public void onResume() {
         super.onResume();
         startBackgroundThread();//为相机开启了一个后台线程，这个进程用于后台执行相关的工作
-
+        startCountDown(10, true);
         // When the screen is turned off and turned back on, the SurfaceTexture is already
         // available, and "onSurfaceTextureAvailable" will not be called. In that case, we can open
         // a camera and start preview from here (otherwise, we wait until the surface is ready in
